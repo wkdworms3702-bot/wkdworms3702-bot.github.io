@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>꿀팁 만화 메이커</title>
+<meta name="description" content="부동산 실생활 꿀팁을 '문제 → 해결' 스토리 만화 쇼츠로 만들어 영상으로 저장합니다.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0e1424; --card:#161e33; --text:#eef1f7; --muted:#a7b0c4; --accent:#ffd600; --line:#253050; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif; line-height:1.6; }
+  main { max-width:960px; margin:0 auto; padding:24px 16px 48px; display:grid; gap:24px; grid-template-columns:minmax(0,380px) minmax(0,1fr); align-items:start; }
+  @media (max-width:760px) { main { grid-template-columns:minmax(0,1fr); } }
+  header { grid-column:1/-1; display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  h1 { font-size:22px; margin:0; }
+  h1 em { color:var(--accent); font-style:normal; }
+  header a { color:var(--accent); font-size:14px; }
+  .stage { position:sticky; top:12px; }
+  @media (max-width:760px) { .stage { position:static; } }
+  canvas { width:100%; max-width:380px; aspect-ratio:9/16; display:block; margin:0 auto; border-radius:16px; background:#000; box-shadow:0 10px 40px rgba(0,0,0,.4); }
+  .bar { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; justify-content:center; }
+  button { font:inherit; font-weight:700; border:0; border-radius:10px; padding:10px 16px; cursor:pointer; background:var(--card); color:var(--text); }
+  button.primary { background:var(--accent); color:#000; }
+  button.small { font-size:13px; padding:6px 10px; background:var(--bg); }
+  button:disabled { opacity:.4; cursor:default; }
+  .progress { height:4px; background:var(--line); border-radius:2px; margin:10px auto 0; max-width:380px; overflow:hidden; }
+  .progress > div { height:100%; width:0; background:var(--accent); }
+  .status { text-align:center; color:var(--muted); font-size:13px; min-height:20px; margin-top:6px; }
+  .card { background:var(--card); border-radius:16px; padding:16px 18px; margin-bottom:12px; }
+  .card h2 { font-size:16px; margin:0; }
+  .head { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px; }
+  .head .btns { display:flex; gap:6px; }
+  .chip { display:inline-block; font-size:12px; font-weight:700; padding:2px 8px; border-radius:6px; margin-left:6px; color:#000; }
+  label { display:block; font-size:13px; color:var(--muted); margin:8px 0 4px; }
+  input, textarea, select { width:100%; font:inherit; color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  textarea { resize:vertical; min-height:52px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  @media (max-width:420px) { .row3 { grid-template-columns:1fr 1fr; } }
+  .hint { color:var(--muted); font-size:13px; margin:0; }
+  .hint b { color:var(--accent); }
+  .add { width:100%; background:var(--accent); color:#000; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>부동산 <em>꿀팁 만화</em> 메이커</h1>
+    <a href="shorts.html">뉴스 쇼츠 메이커 →</a>
+  </header>
+
+  <section class="stage">
+    <canvas id="cv" width="1080" height="1920" aria-label="만화 미리보기"></canvas>
+    <div class="progress"><div id="prog"></div></div>
+    <div class="bar">
+      <button id="play" class="primary">▶ 재생</button>
+      <button id="restart">⟲ 처음부터</button>
+      <button id="rec">● 영상 저장</button>
+    </div>
+    <div class="status" id="status"></div>
+  </section>
+
+  <section>
+    <div class="card">
+      <h2>사용법</h2>
+      <p class="hint" style="margin-top:6px"><b>문제 상황</b> 장면으로 고민을 보여주고, <b>해결 꿀팁</b> 장면에서 집 캐릭터가 방법을 알려주고, <b>결과</b> 장면으로 마무리해요. 꿀팁 장면은 자동으로 ①②③ 번호가 붙고, 마지막에 "꿀팁 정리"로 모아 보여줘요. 자막에서 <b>*별표*</b>로 감싼 말은 노란색으로 강조돼요.</p>
+    </div>
+    <div class="card">
+      <h2>제목</h2>
+      <label for="title">영상 제목 (첫 화면)</label>
+      <input id="title" maxlength="30">
+      <label for="tag">말머리</label>
+      <input id="tag" maxlength="12">
+    </div>
+    <div id="scenes"></div>
+    <button class="add" id="addScene">+ 장면 추가</button>
+    <div class="card" style="margin-top:12px">
+      <h2>저장 안내</h2>
+      <p class="hint" style="margin-top:6px">내용은 이 브라우저에 자동 저장돼요. "영상 저장"은 영상 길이만큼 실시간으로 녹화한 뒤 파일을 내려받아요(소리 없음). 마지막 화면에 "일반 정보이며 법률·투자 자문이 아님 · AI 음성 제작" 안내가 들어가요.</p>
+      <button class="small" id="reset" style="margin-top:10px">예시 이야기로 되돌리기</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const W = 1080, H = 1920;
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const FONT = '"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif';
+  const KEY = 'tips-data-v1';
+
+  // ---------- 예시 이야기 ----------
+  const S = o => Object.assign({ kind: 'problem', who: 'person', mood: 'normal', place: 'room', prop: 'none', propText: '', sfx: '', bubble: '', caption: '' }, o);
+  const DEFAULTS = {
+    title: '전세 계약 전 *꼭 확인할 것*',
+    tag: '실생활 꿀팁',
+    scenes: [
+      S({ kind: 'problem', who: 'person', mood: 'happy', place: 'room', bubble: '시세보다 싸고 깨끗해! 바로 계약할까?', caption: '*시세보다 싼* 전세 집 발견!', sfx: '두근' }),
+      S({ kind: 'problem', who: 'person', mood: 'worried', place: 'focus', prop: 'money', propText: '보증금', bubble: '근데… 보증금 못 돌려받으면 어떡하지?', caption: '혹시 *보증금*을 못 돌려받으면?', sfx: '헉!' }),
+      S({ kind: 'tip', who: 'mascot', place: 'bright', prop: 'doc', propText: '등기부등본', bubble: '계약 전에 이것부터 떼 봐요!', caption: '*등기부등본*으로 집주인·근저당 확인' }),
+      S({ kind: 'tip', who: 'mascot', place: 'bright', prop: 'search', propText: '건축물대장', bubble: '불법 건축물인지도 확인!', caption: '*건축물대장*으로 위반 건축물 확인' }),
+      S({ kind: 'tip', who: 'mascot', place: 'bright', prop: 'calendar', propText: '잔금일', bubble: '이사 날 바로 하세요!', caption: '입주 당일 *전입신고·확정일자*' }),
+      S({ kind: 'tip', who: 'mascot', place: 'bright', prop: 'shield', propText: '보증보험', bubble: '가입 가능한지 미리 물어봐요!', caption: '*전세보증보험* 가입 가능 여부 확인' }),
+      S({ kind: 'result', who: 'both', mood: 'happy', place: 'room', bubble: '덕분에 안심하고 계약했어요!', caption: '꼼꼼히 확인하면 *안심 계약*!', sfx: '해결!' }),
+    ],
+  };
+  const clone = o => JSON.parse(JSON.stringify(o));
+  let data = clone(DEFAULTS);
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (saved && Array.isArray(saved.scenes)) data = { ...clone(DEFAULTS), ...saved, scenes: saved.scenes.map(S) };
+  } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
+
+  // ---------- 타임라인 ----------
+  const HOOK = 3.8, SCENE = 4.4;
+  const tipsOf = () => data.scenes.filter(s => s.kind === 'tip');
+  const outroLen = () => 3 + Math.min(6, tipsOf().length) * 0.5 + 1.8;
+  function timeline() {
+    const list = [{ kind: 'hook', len: HOOK }];
+    let tipNo = 0;
+    data.scenes.forEach((sc, i) => list.push({ kind: 'scene', i, tipNo: sc.kind === 'tip' ? ++tipNo : 0, len: SCENE + Math.max(0, String(sc.bubble).length - 22) * 0.04 }));
+    list.push({ kind: 'outro', len: outroLen() });
+    let s = 0; for (const x of list) { x.start = s; s += x.len; }
+    return { list, total: s };
+  }
+
+  // ---------- 유틸 ----------
+  const clamp = (v, a=0, b=1) => Math.max(a, Math.min(b, v));
+  const prog = (t, s, d) => clamp((t - s) / d);
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  const easeInOut = x => x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+  const back = x => { const c = 1.70158, c3 = c + 1; return 1 + c3*Math.pow(x-1,3) + c*Math.pow(x-1,2); };
+  const hash = n => { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); };
+  const YELLOW = '#ffd600', TEXT = '#eef1f7', MUTED = '#a7b0c4', RED = '#ff4d4f', BLUE = '#3d8bff', GREEN = '#19c37d', INK = '#1d2540', SKIN = '#ffd9b8', CREAM = '#fff6dc';
+  const KIND = { problem: { label: '문제 상황', color: RED }, tip: { label: '해결 꿀팁', color: GREEN }, result: { label: '결과', color: BLUE }, story: { label: '이야기', color: '#9aa6c4' } };
+
+  function font(size, weight=700) { ctx.font = `${weight} ${size}px ${FONT}`; }
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
+  }
+  function fitFont(text, maxW, size, min, weight=900) {
+    font(size, weight); while (ctx.measureText(text).width > maxW && size > min) { size -= 4; font(size, weight); } return size;
+  }
+
+  // *강조* 텍스트 줄바꿈: 단어 = 색 조각 묶음
+  function wrapRich(text, maxW) {
+    const words = []; let hl = false;
+    for (const raw of String(text).split(/\s+/).filter(Boolean)) {
+      const segs = [];
+      raw.split('*').forEach((piece, i) => { if (i > 0) hl = !hl; if (piece) segs.push({ w: piece, hl }); });
+      if (segs.length) words.push(segs);
+    }
+    const space = ctx.measureText(' ').width;
+    const wWidth = segs => segs.reduce((a, g) => a + ctx.measureText(g.w).width, 0);
+    const lines = []; let line = [], lw = 0;
+    const push = () => { if (line.length) lines.push({ words: line, width: lw }); line = []; lw = 0; };
+    for (let segs of words) {
+      let ww = wWidth(segs);
+      if (ww > maxW) {
+        push();
+        const chars = segs.flatMap(g => [...g.w].map(c => ({ w: c, hl: g.hl })));
+        let cur = [];
+        for (const c of chars) {
+          if (cur.length && wWidth([...cur, c]) > maxW) { lines.push({ words: [cur], width: wWidth(cur) }); cur = []; }
+          cur.push(c);
+        }
+        segs = cur; ww = wWidth(cur);
+      }
+      const add = line.length ? space + ww : ww;
+      if (line.length && lw + add > maxW) { push(); line.push(segs); lw = ww; }
+      else { line.push(segs); lw += add; }
+    }
+    push();
+    return lines;
+  }
+  const plainText = s => String(s).replace(/\*/g, '');
+  // opts: stroke, strokeW, color, hlColor, maxChars(타자 효과)
+  function drawRichLines(lines, cx, cy, lh, opts={}) {
+    const space = ctx.measureText(' ').width;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    let left = opts.maxChars ?? Infinity;
+    lines.forEach((ln, i) => {
+      let x = cx - ln.width / 2; const y = cy + (i - (lines.length-1)/2) * lh;
+      for (const segs of ln.words) {
+        for (const g of segs) {
+          if (left <= 0) return;
+          const txt = [...g.w].slice(0, Math.max(0, Math.floor(left))).join('');
+          left -= [...g.w].length;
+          if (opts.stroke) { ctx.strokeStyle = opts.stroke; ctx.lineWidth = opts.strokeW; ctx.strokeText(txt, x, y); }
+          ctx.fillStyle = g.hl ? (opts.hlColor || YELLOW) : (opts.color || '#fff');
+          ctx.fillText(txt, x, y);
+          x += ctx.measureText(g.w).width;
+        }
+        x += space;
+      }
+    });
+  }
+
+  // ---------- 캐릭터 1: 집 마스코트 ----------
+  function drawMascot(x, y, s, t, { talk = false, pose = 'idle', look = [0, 0] } = {}) {
+    const bob = Math.sin(t * 3) * 6;
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, 205, 150, 20, 0, 0, Math.PI*2); ctx.fill();
+    ctx.translate(0, bob); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const [col, lw] of [[INK, 38], ['#ffb84d', 22]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.moveTo(-50, 150); ctx.lineTo(-50, 190 - bob); ctx.moveTo(50, 150); ctx.lineTo(50, 190 - bob); ctx.stroke();
+    }
+    const arm = (sx, ex, ey) => {
+      const qx = (sx + ex) / 2, qy = (70 + ey) / 2 + 20;
+      for (const [col, lw] of [[INK, 34], [CREAM, 18]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(sx, 70); ctx.quadraticCurveTo(qx, qy, ex, ey); ctx.stroke();
+      }
+      ctx.fillStyle = CREAM; ctx.strokeStyle = INK; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(ex, ey, 24, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    };
+    arm(-128, -185, 150 + Math.sin(t * 3 + 1) * 6);
+    if (pose === 'point') arm(128, 225 + Math.sin(t * 5) * 8, -95 + Math.sin(t * 5) * 10);
+    else if (pose === 'wave') { const a = Math.sin(t * 10) * 0.5; arm(128, 128 + Math.cos(-1.1 + a) * 140, 70 + Math.sin(-1.1 + a) * 170); }
+    else arm(128, 185, 150 + Math.sin(t * 3) * 6);
+    ctx.fillStyle = '#d9a900'; ctx.strokeStyle = INK; ctx.lineWidth = 8;
+    roundRect(68, -175, 42, 80, 8); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = CREAM; roundRect(-130, -60, 260, 220, 44); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = YELLOW;
+    ctx.beginPath(); ctx.moveTo(-168, -30); ctx.lineTo(0, -205); ctx.lineTo(168, -30); ctx.closePath(); ctx.fill(); ctx.stroke();
+    const blink = (t % 3.3) > 3.15 ? 0.12 : 1;
+    for (const ex of [-50, 50]) {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(ex, 30, 30, 36 * blink, 0, 0, Math.PI*2); ctx.fill();
+      ctx.lineWidth = 6; ctx.stroke();
+      if (blink > .5) {
+        ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(ex + look[0] * 10, 34 + look[1] * 10, 16, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + look[0] * 10 + 6, 28 + look[1] * 10, 5, 0, Math.PI*2); ctx.fill();
+      }
+    }
+    ctx.fillStyle = 'rgba(255,120,140,.45)';
+    ctx.beginPath(); ctx.ellipse(-92, 82, 22, 13, 0, 0, Math.PI*2); ctx.ellipse(92, 82, 22, 13, 0, 0, Math.PI*2); ctx.fill();
+    if (talk) {
+      const open = 6 + Math.abs(Math.sin(t * 17)) * 18 + Math.abs(Math.sin(t * 7)) * 6;
+      ctx.fillStyle = '#7a1f2b'; ctx.strokeStyle = INK; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.ellipse(0, 100, 26, open, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.strokeStyle = INK; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(0, 86, 26, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ---------- 캐릭터 2: 주인공 (표정: normal / worried / shocked / happy / thinking) ----------
+  function drawPerson(x, y, s, t, { mood = 'normal', talk = false, flip = false } = {}) {
+    const bob = mood === 'shocked' ? Math.sin(t * 40) * 3 : Math.sin(t * 3) * 5;
+    ctx.save(); ctx.translate(x, y); ctx.scale(flip ? -s : s, s);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(0, 0, 130, 18, 0, 0, Math.PI*2); ctx.fill();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // 다리
+    for (const [col, lw] of [[INK, 52], ['#2f3d66', 36]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.moveTo(-36, -150); ctx.lineTo(-40, -22); ctx.moveTo(36, -150); ctx.lineTo(40, -22); ctx.stroke();
+    }
+    ctx.fillStyle = INK; ctx.beginPath(); ctx.ellipse(-48, -12, 40, 20, 0, 0, Math.PI*2); ctx.ellipse(48, -12, 40, 20, 0, 0, Math.PI*2); ctx.fill();
+    ctx.translate(0, bob);
+    // 몸통
+    ctx.fillStyle = '#4a7dff'; ctx.strokeStyle = INK; ctx.lineWidth = 8;
+    roundRect(-92, -262, 184, 150, 56); ctx.fill(); ctx.stroke();
+    // 머리
+    const hy = -350;
+    ctx.fillStyle = SKIN;
+    for (const ex of [-100, 100]) { ctx.beginPath(); ctx.arc(ex, hy + 10, 22, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(0, hy, 104, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    // 머리카락
+    ctx.fillStyle = '#2b2118';
+    ctx.beginPath(); ctx.arc(0, hy - 8, 112, Math.PI * 1.0, Math.PI * 2.0);
+    ctx.quadraticCurveTo(70, hy - 40, 30, hy - 30); ctx.quadraticCurveTo(-20, hy - 70, -112, hy - 8); ctx.closePath(); ctx.fill();
+    // 눈썹
+    ctx.strokeStyle = '#2b2118'; ctx.lineWidth = 9;
+    const brow = { worried: [[-64,-14],[-20,-30]], shocked: [[-62,-40],[-18,-44]], thinking: [[-62,-22],[-18,-26]], happy: [[-62,-26],[-18,-28]], normal: [[-62,-22],[-18,-24]] }[mood] || [[-62,-22],[-18,-24]];
+    for (const sx of [1, -1]) {
+      ctx.beginPath(); ctx.moveTo(brow[0][0] * sx, hy + brow[0][1]); ctx.lineTo(brow[1][0] * sx, hy + brow[1][1] + (mood === 'thinking' && sx < 0 ? -10 : 0)); ctx.stroke();
+    }
+    // 눈
+    const blink = (t % 2.9) > 2.78 ? 0.15 : 1;
+    for (const ex of [-40, 40]) {
+      if (mood === 'happy') {
+        ctx.strokeStyle = INK; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(ex, hy + 12, 16, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+      } else if (mood === 'shocked') {
+        ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.arc(ex, hy + 2, 26, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(ex, hy + 2, 8, 0, Math.PI*2); ctx.fill();
+      } else {
+        const lx = mood === 'thinking' ? 6 : 0, ly = mood === 'thinking' ? -6 : 0;
+        ctx.fillStyle = INK; ctx.beginPath(); ctx.ellipse(ex + lx, hy + 4 + ly, 12, 17 * blink, 0, 0, Math.PI*2); ctx.fill();
+        if (blink > .5) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + lx + 4, hy - 2 + ly, 4, 0, Math.PI*2); ctx.fill(); }
+      }
+    }
+    // 볼
+    ctx.fillStyle = mood === 'worried' ? 'rgba(120,160,255,.25)' : 'rgba(255,120,140,.45)';
+    ctx.beginPath(); ctx.ellipse(-66, hy + 44, 20, 12, 0, 0, Math.PI*2); ctx.ellipse(66, hy + 44, 20, 12, 0, 0, Math.PI*2); ctx.fill();
+    // 입
+    const my = hy + 62;
+    ctx.strokeStyle = INK; ctx.lineWidth = 7; ctx.fillStyle = '#7a1f2b';
+    if (talk) {
+      const open = 5 + Math.abs(Math.sin(t * 17)) * 14 + Math.abs(Math.sin(t * 6)) * 5;
+      ctx.beginPath(); ctx.ellipse(0, my, 20, open, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    } else if (mood === 'happy') {
+      ctx.beginPath(); ctx.arc(0, my - 10, 30, 0.05 * Math.PI, 0.95 * Math.PI); ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (mood === 'shocked') {
+      ctx.beginPath(); ctx.ellipse(0, my, 18, 26, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    } else if (mood === 'worried') {
+      ctx.beginPath(); ctx.moveTo(-26, my + 4);
+      for (let i = 1; i <= 4; i++) ctx.lineTo(-26 + i * 13, my + (i % 2 ? -4 : 4)); ctx.stroke();
+    } else if (mood === 'thinking') {
+      ctx.beginPath(); ctx.moveTo(-14, my); ctx.lineTo(18, my - 6); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.arc(0, my - 14, 22, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+    }
+    // 팔 (표정마다 자세가 다름)
+    const arm = (sx, ex, ey) => {
+      for (const [col, lw] of [[INK, 46], ['#4a7dff', 30]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(sx, -230); ctx.quadraticCurveTo(sx * 1.5, (-230 + ey) / 2 + 30, ex, ey); ctx.stroke();
+      }
+      ctx.fillStyle = SKIN; ctx.strokeStyle = INK; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.arc(ex, ey, 26, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    };
+    const sw = Math.sin(t * 3) * 6;
+    if (mood === 'worried') { arm(-80, -88, hy + 50); arm(80, 88, hy + 50); }
+    else if (mood === 'shocked') { arm(-80, -190, hy - 70 + sw); arm(80, 190, hy - 70 - sw); }
+    else if (mood === 'happy') { arm(-80, -130, -120 + sw); arm(80, 170, hy - 90 + Math.sin(t * 8) * 14); }
+    else if (mood === 'thinking') { arm(-80, -125, -110); arm(80, 34, hy + 96); }
+    else { arm(-80, -125, -110 + sw); arm(80, 125, -110 - sw); }
+    // 효과
+    if (mood === 'worried') {
+      const k = (t * 0.8) % 1;
+      ctx.fillStyle = '#7fc8ff'; ctx.strokeStyle = INK; ctx.lineWidth = 4;
+      ctx.beginPath(); const dx = 120, dy = hy - 60 + k * 50;
+      ctx.moveTo(dx, dy - 26); ctx.quadraticCurveTo(dx + 18, dy, dx, dy + 12); ctx.quadraticCurveTo(dx - 18, dy, dx, dy - 26); ctx.fill(); ctx.stroke();
+    } else if (mood === 'shocked') {
+      ctx.strokeStyle = INK; ctx.lineWidth = 9;
+      for (const a of [-0.6, 0, 0.6]) {
+        const r1 = 140 + Math.sin(t * 20) * 6, r2 = 190;
+        ctx.beginPath(); ctx.moveTo(Math.sin(a) * r1, hy - Math.cos(a) * r1); ctx.lineTo(Math.sin(a) * r2, hy - Math.cos(a) * r2); ctx.stroke();
+      }
+    } else if (mood === 'happy') {
+      for (let i = 0; i < 3; i++) {
+        const a = t * 1.5 + i * 2.1, r = 170;
+        sparkle(Math.cos(a) * r, hy - 40 + Math.sin(a) * r * 0.6, 16 + Math.sin(t * 6 + i) * 6);
+      }
+    } else if (mood === 'thinking') {
+      ctx.save(); ctx.scale(flip ? -1 : 1, 1);
+      font(110, 900); ctx.fillStyle = YELLOW; ctx.strokeStyle = INK; ctx.lineWidth = 10; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const qy = hy - 170 + Math.sin(t * 4) * 8; ctx.strokeText('?', (flip ? -1 : 1) * 130, qy); ctx.fillText('?', (flip ? -1 : 1) * 130, qy);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  function sparkle(x, y, r) {
+    ctx.fillStyle = YELLOW; ctx.strokeStyle = INK; ctx.lineWidth = 4;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? r * 0.35 : r; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+
+  // ---------- 소품 ----------
+  function tagLabel(text, x, y, size = 44) {
+    if (!text) return;
+    size = fitFont(text, 340, size, 26, 900);
+    const w = ctx.measureText(text).width + 50;
+    ctx.fillStyle = INK; roundRect(x - w/2, y - size * 0.8, w, size * 1.6, 14); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 2);
+  }
+  function drawProp(kind, x, y, s, t, label) {
+    if (!kind || kind === 'none') return;
+    ctx.save(); ctx.translate(x, y + Math.sin(t * 2.5) * 10); ctx.scale(s, s);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = 9;
+    let labelBelow = true;
+    if (kind === 'doc') {
+      ctx.rotate(0.06);
+      ctx.fillStyle = '#fff'; roundRect(-140, -180, 280, 360, 16); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = INK; const fs = fitFont(label || '서류', 230, 46, 24); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label || '서류', 0, -122);
+      ctx.fillStyle = '#c9ced9';
+      for (let i = 0; i < 5; i++) { roundRect(-100, -60 + i * 46, i === 2 ? 130 : 200, 18, 9); ctx.fill(); }
+      const hp = prog(t % 3, 0.5, 0.8);
+      ctx.fillStyle = 'rgba(255,214,0,.6)'; roundRect(-108, 24, 216 * hp, 34, 8); ctx.fill();
+      labelBelow = false;
+    } else if (kind === 'search') {
+      const a = Math.sin(t * 2) * 0.15; ctx.rotate(a);
+      ctx.fillStyle = 'rgba(160,215,255,.55)'; ctx.beginPath(); ctx.arc(-20, -30, 120, 0, Math.PI*2); ctx.fill();
+      ctx.lineWidth = 26; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 14; ctx.strokeStyle = '#8a95b5'; ctx.stroke();
+      ctx.strokeStyle = INK; ctx.lineWidth = 50; ctx.beginPath(); ctx.moveTo(70, 60); ctx.lineTo(160, 150); ctx.stroke();
+      ctx.strokeStyle = '#a0522d'; ctx.lineWidth = 32; ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(-20, -30, 80, Math.PI * 1.1, Math.PI * 1.4); ctx.stroke();
+    } else if (kind === 'calendar') {
+      ctx.fillStyle = '#fff'; roundRect(-150, -150, 300, 300, 24); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = RED; roundRect(-150, -150, 300, 80, 24); ctx.fill(); ctx.fillRect(-150, -100, 300, 30);
+      ctx.beginPath(); roundRect(-150, -150, 300, 300, 24); ctx.stroke();
+      ctx.fillStyle = INK; for (const rx of [-80, 80]) { roundRect(rx - 10, -180, 20, 60, 10); ctx.fill(); }
+      fitFont(label || 'D-DAY', 250, 64, 28); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = INK;
+      ctx.fillText(label || 'D-DAY', 0, 10);
+      const cp = back(prog(t % 3, 0.6, 0.4));
+      if (cp > 0) { ctx.save(); ctx.translate(0, 85); ctx.scale(cp, cp); ctx.strokeStyle = RED; ctx.lineWidth = 10; ctx.beginPath(); ctx.ellipse(0, 0, 90, 38, 0, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
+      labelBelow = false;
+    } else if (kind === 'shield') {
+      ctx.fillStyle = BLUE; ctx.beginPath();
+      ctx.moveTo(0, -170); ctx.quadraticCurveTo(90, -120, 150, -130); ctx.quadraticCurveTo(150, 80, 0, 170);
+      ctx.quadraticCurveTo(-150, 80, -150, -130); ctx.quadraticCurveTo(-90, -120, 0, -170); ctx.closePath(); ctx.fill(); ctx.stroke();
+      const cp = easeOut(prog(t % 3, 0.3, 0.6));
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 30; ctx.beginPath(); ctx.moveTo(-60, 0);
+      if (cp < .4) ctx.lineTo(-60 + 50 * cp / .4, 50 * cp / .4); else { ctx.lineTo(-10, 50); ctx.lineTo(-10 + 90 * (cp - .4) / .6, 50 - 110 * (cp - .4) / .6); }
+      ctx.stroke();
+    } else if (kind === 'money') {
+      for (let i = 2; i >= 0; i--) {
+        ctx.save(); ctx.translate(i * 14 - 14, -i * 22); ctx.rotate(-0.08 + i * 0.05);
+        ctx.fillStyle = '#7ed492'; roundRect(-160, -80, 320, 160, 14); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#4caf6a'; ctx.beginPath(); ctx.arc(0, 0, 48, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        font(60, 900); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('₩', 0, 4);
+        ctx.restore();
+      }
+      // 날아가는 돈 (걱정)
+      const k = (t * 0.7) % 1;
+      ctx.save(); ctx.globalAlpha = 1 - k; ctx.translate(120 + k * 120, -140 - k * 160); ctx.rotate(k * 2);
+      ctx.fillStyle = '#7ed492'; roundRect(-60, -30, 120, 60, 8); ctx.fill(); ctx.stroke(); ctx.restore();
+    } else if (kind === 'phone') {
+      ctx.rotate(-0.08 + Math.sin(t * 20) * 0.03 * (Math.sin(t * 2) > 0.5 ? 1 : 0));
+      ctx.fillStyle = INK; roundRect(-110, -200, 220, 400, 34); ctx.fill();
+      ctx.fillStyle = '#e8f0ff'; roundRect(-92, -170, 184, 330, 16); ctx.fill();
+      ctx.fillStyle = BLUE; roundRect(-74, -140, 148, 90, 14); ctx.fill();
+      fitFont(label || '알림', 130, 40, 20); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label || '알림', 0, -94);
+      ctx.fillStyle = '#c9ced9'; for (let i = 0; i < 3; i++) { roundRect(-74, -20 + i * 44, i === 1 ? 100 : 148, 20, 10); ctx.fill(); }
+      labelBelow = false;
+    } else if (kind === 'house') {
+      ctx.fillStyle = '#fff'; ctx.fillRect(-130, -20, 260, 170); ctx.strokeRect(-130, -20, 260, 170);
+      ctx.fillStyle = RED; ctx.beginPath(); ctx.moveTo(-170, -10); ctx.lineTo(0, -170); ctx.lineTo(170, -10); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = YELLOW; ctx.fillRect(-90, 20, 60, 60); ctx.strokeRect(-90, 20, 60, 60);
+      ctx.fillStyle = INK; ctx.fillRect(30, 50, 60, 100);
+    } else if (kind === 'check') {
+      ctx.fillStyle = GREEN; ctx.beginPath(); ctx.arc(0, 0, 150, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      const cp = easeOut(prog(t % 3, 0.3, 0.6));
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 34; ctx.beginPath(); ctx.moveTo(-70, 0);
+      if (cp < .4) ctx.lineTo(-70 + 50 * cp / .4, 55 * cp / .4); else { ctx.lineTo(-20, 55); ctx.lineTo(-20 + 100 * (cp - .4) / .6, 55 - 120 * (cp - .4) / .6); }
+      ctx.stroke();
+    } else if (kind === 'warning') {
+      const pulse = 1 + Math.sin(t * 8) * 0.05; ctx.scale(pulse, pulse);
+      ctx.fillStyle = YELLOW; ctx.beginPath(); ctx.moveTo(0, -170); ctx.lineTo(170, 130); ctx.lineTo(-170, 130); ctx.closePath(); ctx.fill(); ctx.lineWidth = 12; ctx.stroke();
+      font(180, 900); ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', 0, 30);
+    }
+    ctx.restore();
+    if (labelBelow && label) tagLabel(label, x, y + 220 * s);
+  }
+
+  // ---------- 배경 (패널 안) ----------
+  function drawPlace(place, x, y, w, h, t) {
+    ctx.save(); ctx.translate(x, y);
+    if (place === 'room') {
+      ctx.fillStyle = '#f6e7cf'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#d9b48a'; ctx.fillRect(0, h * 0.78, w, h * 0.22);
+      ctx.strokeStyle = 'rgba(0,0,0,.15)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, h * 0.78); ctx.lineTo(w, h * 0.78); ctx.stroke();
+      ctx.fillStyle = '#9fd3ff'; ctx.fillRect(w - 330, 330, 240, 200);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(w - 250 + Math.sin(t * .5) * 20, 400, 30, 0, Math.PI*2); ctx.arc(w - 215 + Math.sin(t * .5) * 20, 395, 38, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#8b6b4a'; ctx.lineWidth = 14; ctx.strokeRect(w - 330, 330, 240, 200);
+      ctx.beginPath(); ctx.moveTo(w - 210, 330); ctx.lineTo(w - 210, 530); ctx.stroke();
+      ctx.fillStyle = '#5aa469'; ctx.beginPath(); ctx.ellipse(110, h * 0.66, 50, 90, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#c0704a'; ctx.fillRect(80, h * 0.72, 60, 70);
+    } else if (place === 'office') {
+      ctx.fillStyle = '#e6eef8'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = INK; roundRect(w/2 - 170, 330, 340, 90, 14); ctx.fill();
+      font(52, 900); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('공인중개사', w/2, 378);
+      ctx.fillStyle = '#a97c50'; ctx.fillRect(0, h * 0.8, w, h * 0.2);
+      ctx.fillStyle = '#8a6440'; ctx.fillRect(0, h * 0.8, w, 20);
+    } else if (place === 'street') {
+      const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#8fd0ff'); g.addColorStop(1, '#d8f0ff');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      for (let i = 0; i < 7; i++) {
+        const bw = 120 + hash(i + 2) * 60, bh = 260 + hash(i + 9) * 260, bx = i * 150 - 20;
+        ctx.fillStyle = ['#ffb4a2', '#b5c7ff', '#ffe08a', '#c4ecc4'][i % 4]; ctx.fillRect(bx, h * 0.8 - bh, bw, bh);
+        ctx.fillStyle = 'rgba(255,255,255,.7)';
+        for (let wy = h * 0.8 - bh + 30; wy < h * 0.8 - 40; wy += 60) for (let wx = bx + 20; wx < bx + bw - 30; wx += 44) ctx.fillRect(wx, wy, 24, 30);
+      }
+      ctx.fillStyle = '#b8bcc6'; ctx.fillRect(0, h * 0.8, w, h * 0.2);
+    } else if (place === 'focus') {
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = INK; const cx = w/2, cy = h * 0.55;
+      for (let i = 0; i < 80; i++) {
+        const a = i / 80 * Math.PI * 2 + hash(i) * 0.05, r0 = 330 + hash(i + 50) * 160 + Math.sin(t * 6 + i) * 10, r1 = 1000, wd = 0.008 + hash(i + 9) * 0.012;
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+        ctx.lineTo(cx + Math.cos(a - wd) * r1, cy + Math.sin(a - wd) * r1); ctx.lineTo(cx + Math.cos(a + wd) * r1, cy + Math.sin(a + wd) * r1); ctx.closePath(); ctx.fill();
+      }
+    } else { // bright: 노란 배경 + 망점
+      ctx.fillStyle = '#ffe766'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = 'rgba(255,170,0,.35)';
+      for (let yy = 0; yy < h; yy += 34) for (let xx = (yy / 34 % 2) * 17; xx < w; xx += 34) {
+        const r = 3 + 7 * clamp(1 - Math.hypot(xx - w, yy) / 900);
+        ctx.beginPath(); ctx.arc(xx, yy, r, 0, Math.PI*2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // ---------- 말풍선 / 효과음 ----------
+  function speech(text, cx, top, tailX, tailY, a, chars) {
+    if (!text) return;
+    font(54, 900);
+    const lines = wrapRich(text, 560).slice(0, 4);
+    const tw = Math.max(...lines.map(l => l.width)), bw = tw + 90, bh = lines.length * 70 + 60;
+    const x = clamp(cx - bw / 2, 40, W - 40 - bw);
+    top = Math.max(top, tailY - 150 - bh); // 머리 가까이
+    ctx.save(); ctx.globalAlpha = a;
+    const tx = clamp(tailX, x + 60, x + bw - 60);
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 9; ctx.lineJoin = 'round';
+    roundRect(x, top, bw, bh, 50); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tx - 34, top + bh - 5); ctx.quadraticCurveTo(tx, top + bh + 30, tailX, tailY); ctx.quadraticCurveTo(tx + 10, top + bh + 20, tx + 30, top + bh - 5); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tx - 34, top + bh); ctx.quadraticCurveTo(tx, top + bh + 30, tailX, tailY); ctx.quadraticCurveTo(tx + 10, top + bh + 20, tx + 30, top + bh); ctx.stroke();
+    drawRichLines(lines, x + bw / 2, top + bh / 2, 70, { color: INK, hlColor: RED, maxChars: chars });
+    ctx.restore();
+  }
+  function burst(text, x, y, t0, lt) {
+    if (!text) return;
+    const p = prog(lt, t0, 0.35); if (p <= 0) return;
+    const sc = p < 1 ? 1.6 - 0.6 * easeOut(p) : 1 + Math.sin(lt * 10) * 0.03;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-0.12); ctx.scale(sc, sc); ctx.globalAlpha = clamp(p * 2);
+    const size = fitFont(text, 220, 84, 40, 900);
+    const r = Math.max(110, ctx.measureText(text).width / 2 + 40);
+    ctx.fillStyle = YELLOW; ctx.strokeStyle = INK; ctx.lineWidth = 9; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, rr = i % 2 ? r * 0.72 : r * (0.95 + hash(i) * 0.15); ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr * 0.75); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = RED; ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.strokeText(text, 0, 4); ctx.fillText(text, 0, 4);
+    ctx.restore();
+  }
+
+  // ---------- 장면 그리기 ----------
+  const PX = 50, PY = 260, PW = W - 100, PH = 1110; // 만화 칸 위치
+  function chip(text, color, x, y, a) {
+    ctx.save(); ctx.globalAlpha = a; font(46, 900);
+    const w = ctx.measureText(text).width + 50;
+    ctx.fillStyle = color; ctx.strokeStyle = INK; ctx.lineWidth = 6; roundRect(x, y - 38, w, 76, 16); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + 25, y + 2);
+    ctx.restore();
+  }
+  function progressDots(cur) {
+    const n = data.scenes.length; if (!n) return;
+    const gap = 8, w = Math.min(120, (W - 180 - gap * (n - 1)) / n), x0 = (W - (w * n + gap * (n - 1))) / 2;
+    data.scenes.forEach((sc, i) => {
+      ctx.fillStyle = i < cur ? YELLOW : i === cur ? KIND[sc.kind].color : 'rgba(255,255,255,.18)';
+      roundRect(x0 + i * (w + gap), 90, w, 14, 7); ctx.fill();
+    });
+  }
+
+  function drawScene(lt, item) {
+    const sc = data.scenes[item.i], len = item.len;
+    progressDots(item.i);
+    const k = KIND[sc.kind] || KIND.story;
+    const label = sc.kind === 'tip' ? `${k.label} ${'①②③④⑤⑥⑦⑧⑨⑩'[item.tipNo - 1] || item.tipNo}` : k.label;
+    chip(label, k.color, PX, 190, easeOut(prog(lt, 0.1, 0.4)));
+
+    // 칸이 옆에서 들어옴
+    const pin = easeOut(prog(lt, 0, 0.45));
+    ctx.save();
+    ctx.translate(W/2 + (1 - pin) * 500, PY + PH/2); ctx.rotate((1 - pin) * 0.12); ctx.translate(-W/2, -(PY + PH/2));
+    ctx.save(); roundRect(PX, PY, PW, PH, 18); ctx.clip();
+    drawPlace(sc.place, PX, PY, PW, PH, lt);
+
+    const foot = PY + PH - 40;
+    const hasProp = sc.prop && sc.prop !== 'none';
+    const typing = prog(lt, 0.75, Math.max(1, [...plainText(sc.bubble)].length * 0.055));
+    const talking = typing > 0 && typing < 1 || (lt > 0.75 && lt < 0.75 + [...plainText(sc.bubble)].length * 0.055 + 0.6);
+    const pop = back(prog(lt, 0.25, 0.5));
+    let speaker = { x: W/2, y: foot - 480 };
+
+    const pScale = 1.0, mScale = 1.0;
+    if (sc.who === 'both') {
+      const mood = sc.mood || 'happy';
+      ctx.save(); ctx.translate(320, foot); ctx.scale(pop, pop); drawPerson(0, 0, pScale, lt, { mood, talk: talking }); ctx.restore();
+      ctx.save(); ctx.translate(760, foot - 200 * mScale); ctx.scale(pop, pop); drawMascot(0, 0, mScale, lt + 1, { pose: 'wave' }); ctx.restore();
+      speaker = { x: 320, y: foot - 470 * pScale };
+    } else if (sc.who === 'mascot') {
+      const mx = hasProp ? 300 : W/2;
+      ctx.save(); ctx.translate(mx, foot - 200 * mScale); ctx.scale(pop, pop);
+      drawMascot(0, 0, mScale, lt, { talk: talking, pose: hasProp ? 'point' : 'wave', look: hasProp ? [0.8, -0.3] : [0, 0] }); ctx.restore();
+      speaker = { x: mx, y: foot - 420 * mScale };
+    } else if (sc.who === 'person') {
+      const px = hasProp ? 330 : W/2;
+      ctx.save(); ctx.translate(px, foot); ctx.scale(pop, pop); drawPerson(0, 0, pScale, lt, { mood: sc.mood, talk: talking }); ctx.restore();
+      speaker = { x: px, y: foot - 470 * pScale };
+    }
+    if (hasProp) {
+      const pp = back(prog(lt, 0.5, 0.5));
+      const ppx = sc.who === 'none' ? W/2 : 760;
+      ctx.save(); ctx.translate(ppx, foot - 330); ctx.scale(pp, pp); drawProp(sc.prop, 0, 0, sc.who === 'none' ? 1.3 : 0.95, lt, sc.propText); ctx.restore();
+    }
+    ctx.restore(); // clip 해제
+    ctx.lineWidth = 14; ctx.strokeStyle = INK; roundRect(PX, PY, PW, PH, 18); ctx.stroke();
+
+    // 말풍선 + 효과음 (칸 밖으로 살짝 나와도 됨)
+    const ba = back(prog(lt, 0.6, 0.35));
+    if (ba > 0 && sc.who !== 'none') {
+      ctx.save(); ctx.translate(speaker.x, PY + 120); ctx.scale(ba, ba); ctx.translate(-speaker.x, -(PY + 120));
+      speech(sc.bubble, speaker.x + (speaker.x < W/2 ? 120 : 0), PY + 50, speaker.x + 30, speaker.y, 1, [...plainText(sc.bubble)].length * typing);
+      ctx.restore();
+    }
+    burst(sc.sfx, speaker.x < W/2 ? W - 230 : 230, PY + 470, 0.35, lt);
+    ctx.restore();
+
+    // 큰 자막
+    const cp = back(prog(lt, 1.0, 0.4));
+    if (sc.caption && cp > 0) {
+      ctx.save(); ctx.translate(W/2, 1550); ctx.scale(0.7 + 0.3 * cp, 0.7 + 0.3 * cp); ctx.globalAlpha = clamp(cp * 1.5);
+      let size = 84; font(size, 900); let lines = wrapRich(sc.caption, 980);
+      while (lines.length > 2 && size > 56) { size -= 6; font(size, 900); lines = wrapRich(sc.caption, 980); }
+      drawRichLines(lines, 0, 0, size * 1.22, { stroke: '#000', strokeW: size * 0.2 });
+      ctx.restore();
+    }
+  }
+
+  function drawHook(lt) {
+    // 집중선 배경 위 큰 제목
+    drawPlace('focus', 0, 0, W, H, lt);
+    ctx.fillStyle = 'rgba(14,20,36,.0)';
+    const tp = prog(lt, 0.1, 0.5);
+    ctx.save(); ctx.translate(W/2, 260); ctx.scale(back(tp), back(tp));
+    font(56, 900); const tg = data.tag || '꿀팁';
+    const w = ctx.measureText(tg).width + 70;
+    ctx.fillStyle = RED; ctx.strokeStyle = INK; ctx.lineWidth = 8; roundRect(-w/2, -50, w, 100, 50); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(tg, 0, 3);
+    ctx.restore();
+
+    const b = prog(lt, 0.4, 0.45);
+    if (b > 0) {
+      const sc = 1.8 - 0.8 * easeOut(b);
+      ctx.save(); ctx.translate(W/2, 620); ctx.rotate(-0.04); ctx.scale(sc, sc); ctx.globalAlpha = clamp(b * 2);
+      font(128, 900); let lines = wrapRich(data.title, 940); let size = 128;
+      while (lines.length > 3 && size > 80) { size -= 8; font(size, 900); lines = wrapRich(data.title, 940); }
+      const bh = lines.length * size * 1.25 + 90;
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 14; roundRect(-500, -bh/2, 1000, bh, 30); ctx.fill(); ctx.stroke();
+      drawRichLines(lines, 0, 0, size * 1.25, { color: INK, hlColor: RED });
+      ctx.restore();
+    }
+    // 두 캐릭터가 아래에서 등장
+    const pc = back(prog(lt, 1.0, 0.6)), mc = back(prog(lt, 1.3, 0.6));
+    drawPerson(320, 1820 + (1 - pc) * 700, 1.25, lt, { mood: 'thinking' });
+    drawMascot(780, 1560 + (1 - mc) * 800, 1.15, lt, { pose: 'wave', talk: lt > 1.8 && lt < 3.3 });
+    burst('궁금!', 250, 1080, 1.6, lt);
+  }
+
+  function drawOutro(lt) {
+    ctx.fillStyle = '#ffe766'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(255,170,0,.3)';
+    for (let yy = 0; yy < H; yy += 40) for (let xx = (yy / 40 % 2) * 20; xx < W; xx += 40) { ctx.beginPath(); ctx.arc(xx, yy, 5, 0, Math.PI*2); ctx.fill(); }
+    const tips = tipsOf().slice(0, 6);
+    const h = back(prog(lt, 0.1, 0.5));
+    ctx.save(); ctx.translate(W/2, 220); ctx.scale(h, h);
+    font(84, 900); ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('오늘의 꿀팁 정리', 0, 0);
+    ctx.restore();
+    const boxH = Math.max(1, tips.length) * 120 + 60;
+    ctx.save(); ctx.globalAlpha = easeOut(prog(lt, 0.3, 0.4));
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 12; roundRect(60, 320, W - 120, boxH, 30); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    tips.forEach((tip, i) => {
+      const p = easeOut(prog(lt, 0.6 + i * 0.5, 0.4)); if (p <= 0) return;
+      const y = 410 + i * 120;
+      ctx.save(); ctx.globalAlpha = p; ctx.translate((1 - p) * 60, 0);
+      ctx.strokeStyle = INK; ctx.lineWidth = 6; ctx.fillStyle = '#fff'; roundRect(110, y - 34, 68, 68, 12); ctx.fill(); ctx.stroke();
+      const cp = prog(lt, 0.8 + i * 0.5, 0.3);
+      if (cp > 0) { ctx.strokeStyle = GREEN; ctx.lineWidth = 14; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(124, y); ctx.lineTo(140, y + 18 * clamp(cp * 2)); if (cp > .5) ctx.lineTo(140 + 34 * (cp - .5) * 2, y + 18 - 46 * (cp - .5) * 2); ctx.stroke(); }
+      const txt = plainText(tip.caption || tip.bubble);
+      fitFont(txt, 780, 50, 30, 700); ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 210, y + 2);
+      ctx.restore();
+    });
+    const sy = 320 + boxH + 140, sp = easeOut(prog(lt, 0.8 + tips.length * 0.5, 0.5)), pulse = 1 + Math.sin(lt * 6) * 0.04 * sp;
+    ctx.save(); ctx.globalAlpha = sp; ctx.translate(W/2, sy); ctx.scale(pulse, pulse);
+    ctx.fillStyle = '#ff0033'; ctx.strokeStyle = INK; ctx.lineWidth = 8; roundRect(-270, -80, 540, 160, 80); ctx.fill(); ctx.stroke();
+    font(68, 900); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('구독 · 좋아요', 0, 4);
+    ctx.restore();
+    ctx.save(); ctx.globalAlpha = sp; font(36, 700); ctx.fillStyle = INK; ctx.textAlign = 'center';
+    ctx.fillText('일반 정보이며 법률·투자 자문이 아닙니다', W/2, sy + 150);
+    ctx.fillText('AI 음성으로 제작되었습니다', W/2, sy + 200);
+    ctx.restore();
+    const mp = back(prog(lt, 0.3, 0.6));
+    drawMascot(W - 190, 1680 + (1 - mp) * 500, 0.75, lt, { pose: 'wave' });
+    drawPerson(180, 1880 + (1 - mp) * 500, 0.75, lt, { mood: 'happy' });
+  }
+
+  // ---------- 렌더 ----------
+  function render(t) {
+    const { list, total } = timeline();
+    t = clamp(t, 0, total - 0.001);
+    ctx.clearRect(0, 0, W, H);
+    const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b1020'); g.addColorStop(1, '#1b2547');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const item = list.find(s => t < s.start + s.len) || list[list.length - 1];
+    const lt = t - item.start;
+    const out = item.kind === 'outro' ? 0 : easeInOut(prog(lt, item.len - 0.3, 0.3));
+    ctx.save(); ctx.globalAlpha = 1 - out;
+    if (item.kind === 'hook') drawHook(lt);
+    else if (item.kind === 'outro') drawOutro(lt);
+    else drawScene(lt, item);
+    ctx.restore();
+    font(32, 700); ctx.fillStyle = item.kind === 'scene' ? 'rgba(255,255,255,.5)' : 'rgba(29,37,64,.6)';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('부동산 정보 룽숏', W/2, H - 60);
+  }
+  window.renderAt = render;
+  window.totalDuration = () => timeline().total;
+
+  // ---------- 재생 / 녹화 ----------
+  const playBtn = document.getElementById('play'), recBtn = document.getElementById('rec');
+  const progEl = document.getElementById('prog'), statusEl = document.getElementById('status');
+  let playing = false, t0 = 0, cur = 2.6, onEnd = null;
+  const setProg = () => { progEl.style.width = (cur / timeline().total * 100) + '%'; };
+  function frame(now) {
+    if (!playing) return;
+    cur = (now - t0) / 1000;
+    const total = timeline().total;
+    if (cur >= total) { cur = total; render(total); playing = false; setBtn(); setProg(); if (onEnd) { const f = onEnd; onEnd = null; f(); } return; }
+    render(cur); setProg(); requestAnimationFrame(frame);
+  }
+  function play(from) {
+    if (from !== undefined) cur = from;
+    if (cur >= timeline().total) cur = 0;
+    t0 = performance.now() - cur * 1000; playing = true; setBtn(); requestAnimationFrame(frame);
+  }
+  function setBtn() { playBtn.textContent = playing ? '❚❚ 일시정지' : '▶ 재생'; }
+  playBtn.onclick = () => { if (playing) { playing = false; setBtn(); } else play(); };
+  document.getElementById('restart').onclick = () => play(0);
+  function preview(t) { if (playing) return; cur = t; render(cur); setProg(); }
+  const previewScene = i => { const it = timeline().list[i + 1]; if (it) preview(it.start + Math.min(it.len - 0.4, 3.2)); };
+
+  recBtn.onclick = () => {
+    if (!cv.captureStream || !window.MediaRecorder) { statusEl.textContent = '이 브라우저는 영상 저장을 지원하지 않아요. 화면 녹화를 이용해 주세요.'; return; }
+    const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+    const mime = types.find(m => MediaRecorder.isTypeSupported(m)) || '';
+    let rec;
+    try { rec = new MediaRecorder(cv.captureStream(30), mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : undefined); }
+    catch (e) { statusEl.textContent = '녹화를 시작할 수 없어요: ' + e.message; return; }
+    const chunks = [];
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      const type = rec.mimeType || mime || 'video/webm';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(chunks, { type }));
+      a.download = `tips-${new Date().toISOString().slice(0,10)}.${type.includes('mp4') ? 'mp4' : 'webm'}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      statusEl.textContent = '저장 완료!'; recBtn.disabled = false;
+    };
+    recBtn.disabled = true; statusEl.textContent = `녹화 중… (${Math.round(timeline().total)}초) 탭을 닫지 마세요`;
+    rec.start(); onEnd = () => setTimeout(() => rec.stop(), 300); play(0);
+  };
+
+  // ---------- 편집 폼 ----------
+  const OPTS = {
+    kind: { problem: '문제 상황', tip: '해결 꿀팁', result: '결과', story: '이야기(번호 없음)' },
+    who: { person: '주인공', mascot: '집 캐릭터', both: '둘 다', none: '없음(소품만)' },
+    mood: { normal: '보통', worried: '걱정', shocked: '깜짝', thinking: '고민', happy: '기쁨' },
+    place: { room: '방 안', office: '중개사무소', street: '거리', focus: '집중선(긴장)', bright: '노란 배경' },
+    prop: { none: '없음', doc: '서류', search: '돋보기', calendar: '달력', shield: '보험·방패', money: '돈', phone: '휴대폰', house: '집', check: '체크', warning: '경고' },
+  };
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  const sel = (k, label) => `<div><label>${label}</label><select data-k="${k}">${Object.entries(OPTS[k]).map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('')}</select></div>`;
+  const box = document.getElementById('scenes');
+  function buildForms() {
+    for (const k of ['title', 'tag']) {
+      const el = document.getElementById(k); el.value = data[k];
+      el.oninput = () => { data[k] = el.value; save(); preview(2.4); };
+    }
+    box.innerHTML = '';
+    data.scenes.forEach((sc, i) => {
+      const card = document.createElement('div'); card.className = 'card';
+      const k = KIND[sc.kind] || KIND.story;
+      card.innerHTML = `<div class="head"><h2>장면 ${i + 1}<span class="chip" style="background:${k.color}">${esc(k.label)}</span></h2>
+        <div class="btns"><button class="small" data-a="up" ${i === 0 ? 'disabled' : ''} aria-label="위로">▲</button><button class="small" data-a="down" ${i === data.scenes.length - 1 ? 'disabled' : ''} aria-label="아래로">▼</button><button class="small" data-a="del" aria-label="삭제">✕</button></div></div>
+        <div class="row3">${sel('kind', '장면 종류')}${sel('who', '등장인물')}${sel('mood', '주인공 표정')}</div>
+        <div class="row3">${sel('place', '배경')}${sel('prop', '소품')}<div><label>소품 글자</label><input data-k="propText" maxlength="10"></div></div>
+        <label>말풍선 대사</label><textarea data-k="bubble" maxlength="60"></textarea>
+        <div class="row"><div><label>큰 자막 (*강조*)</label><input data-k="caption" maxlength="40"></div><div><label>효과음 (예: 헉!)</label><input data-k="sfx" maxlength="6"></div></div>`;
+      box.appendChild(card);
+      card.querySelectorAll('[data-k]').forEach(el => {
+        el.value = sc[el.dataset.k] || '';
+        el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => {
+          sc[el.dataset.k] = el.value; save();
+          if (el.dataset.k === 'kind') buildForms();
+          previewScene(i);
+        };
+        el.onfocus = () => previewScene(i);
+      });
+      card.querySelectorAll('[data-a]').forEach(btn => btn.onclick = () => {
+        const a = btn.dataset.a;
+        if (a === 'del') { if (!confirm(`장면 ${i + 1}을 지울까요?`)) return; data.scenes.splice(i, 1); }
+        else { const j = a === 'up' ? i - 1 : i + 1; [data.scenes[i], data.scenes[j]] = [data.scenes[j], data.scenes[i]]; }
+        save(); buildForms(); previewScene(Math.min(i, data.scenes.length - 1));
+      });
+    });
+    document.getElementById('addScene').disabled = data.scenes.length >= 12;
+  }
+  document.getElementById('addScene').onclick = () => {
+    data.scenes.push(S({ kind: 'tip', who: 'mascot', place: 'bright', prop: 'check', bubble: '대사를 입력하세요', caption: '*꿀팁* 자막을 입력하세요' }));
+    save(); buildForms(); previewScene(data.scenes.length - 1);
+  };
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('입력한 내용을 지우고 예시 이야기로 되돌릴까요?')) return;
+    data = clone(DEFAULTS); save(); buildForms(); preview(2.6);
+  };
+  buildForms();
+
+  render(cur);
+  const ready = document.fonts ? Promise.all([document.fonts.load(`900 80px "Noto Sans KR"`), document.fonts.load(`700 40px "Noto Sans KR"`)]) : Promise.resolve();
+  ready.catch(() => {}).then(() => { if (!playing) render(cur); });
+})();
+</script>
+</body>
+</html>
