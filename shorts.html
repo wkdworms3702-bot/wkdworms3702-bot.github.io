@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>쇼츠 애니메이션 메이커</title>
-<meta name="description" content="부동산 뉴스 3개를 넣으면 9:16 쇼츠 애니메이션으로 만들어 영상으로 저장합니다.">
+<meta name="description" content="부동산 뉴스 3개를 캐릭터·인포그래픽·큰 자막의 9:16 쇼츠 애니메이션으로 만들어 영상으로 저장합니다.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
@@ -31,8 +31,11 @@
   label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
   input, textarea, select { width:100%; font:inherit; color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
   textarea { resize:vertical; min-height:56px; }
-  .row { display:grid; grid-template-columns:1fr 120px; gap:8px; }
+  textarea.script { min-height:96px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .hint { color:var(--muted); font-size:13px; margin:0; }
+  .hint b { color:var(--accent); }
+  .reset { font-size:13px; padding:6px 12px; margin-top:10px; }
 </style>
 </head>
 <body>
@@ -52,16 +55,23 @@
 
   <section>
     <div class="card">
+      <h2>사용법</h2>
+      <p class="hint">"자막 대본"은 <b>한 줄이 한 장면</b>이에요. 줄마다 큰 자막이 차례로 나오고 캐릭터가 말해요. 강조할 말은 <b>*별표*</b>로 감싸면 노란색이 돼요. "핵심 숫자"는 그래프 위에 크게 나와요(+는 빨강, −는 파랑).</p>
+    </div>
+    <div class="card">
       <h2>기본 정보</h2>
       <label for="date">날짜</label>
       <input id="date">
       <label for="title">오프닝 제목</label>
       <input id="title">
+      <label for="greet">캐릭터 첫인사</label>
+      <input id="greet">
     </div>
     <div id="newsForms"></div>
     <div class="card">
-      <h2>안내</h2>
-      <p class="hint">내용을 고치면 미리보기에 바로 반영되고, 이 브라우저에 저장됩니다. "영상 저장"을 누르면 약 30초 동안 실시간으로 녹화한 뒤 파일을 내려받습니다(소리 없음 — 편집 앱에서 AI 음성을 입히세요). 마지막 화면에 "투자 권유 아님 · AI 음성 제작" 안내가 들어갑니다.</p>
+      <h2>저장 안내</h2>
+      <p class="hint">내용은 이 브라우저에 자동 저장돼요. "영상 저장"을 누르면 영상 길이만큼 실시간으로 녹화한 뒤 파일을 내려받아요(소리 없음 — 편집 앱에서 AI 음성을 입히세요). 마지막 화면에 "투자 권유 아님 · AI 음성 제작" 안내가 들어가요.</p>
+      <button class="reset" id="reset">예시 내용으로 되돌리기</button>
     </div>
   </section>
 </main>
@@ -72,30 +82,43 @@
   const cv = document.getElementById('cv');
   const ctx = cv.getContext('2d');
   const FONT = '"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif';
+  const KEY = 'shorts-data-v2';
 
   // ---------- 데이터 ----------
   const today = new Date();
   const days = ['일','월','화','수','목','금','토'];
-  const defaultDate = `${today.getMonth()+1}월 ${today.getDate()}일 (${days[today.getDay()]})`;
   const DEFAULTS = {
-    date: defaultDate,
+    date: `${today.getMonth()+1}월 ${today.getDate()}일 (${days[today.getDay()]})`,
     title: '오늘의 부동산 뉴스',
+    greet: '1분이면 끝나요!',
     news: [
-      { headline: '여기에 첫 번째 뉴스 헤드라인을 입력하세요', source: '○○일보', icon: 'chart' },
-      { headline: '두 번째 뉴스: 매물·분양 소식을 적어보세요', source: '○○경제', icon: 'house' },
-      { headline: '세 번째 뉴스: 정책·규제 소식을 적어보세요', source: '○○뉴스', icon: 'policy' },
+      { headline: '첫 번째 뉴스 헤드라인을 입력하세요', icon: 'chart', stat: '+0.12%', statLabel: '예시) 주간 아파트값 변동률',
+        script: '여기에 *자막*을 한 줄씩 적어요\n줄마다 한 장면씩 나와요\n*별표*로 감싸면 노란 강조!', source: '○○일보' },
+      { headline: '두 번째 뉴스 헤드라인을 입력하세요', icon: 'number', stat: '1,234건', statLabel: '예시) 이번 달 거래량',
+        script: '숫자가 *0부터 올라가요*\n핵심 숫자 칸을 바꿔보세요', source: '○○경제' },
+      { headline: '세 번째 뉴스 헤드라인을 입력하세요', icon: 'policy', stat: '', statLabel: '예시) 정책 발표',
+        script: '정책 뉴스엔 *도장 그림*\n그림 종류는 아래에서 골라요\n세 줄까지 넣어도 좋아요', source: '○○뉴스' },
     ],
   };
-  let data = JSON.parse(JSON.stringify(DEFAULTS));
+  const clone = o => JSON.parse(JSON.stringify(o));
+  let data = clone(DEFAULTS);
   try {
-    const saved = JSON.parse(localStorage.getItem('shorts-data') || 'null');
-    if (saved && Array.isArray(saved.news) && saved.news.length === 3) data = saved;
+    const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (saved && Array.isArray(saved.news) && saved.news.length === 3) data = Object.assign(clone(DEFAULTS), saved);
   } catch (e) {}
-  const save = () => { try { localStorage.setItem('shorts-data', JSON.stringify(data)); } catch (e) {} };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
 
   // ---------- 타임라인 ----------
-  const INTRO = 4, NEWS = 7, OUTRO = 4.5;
-  const DURATION = INTRO + NEWS * 3 + OUTRO;
+  const INTRO = 4.5, OUTRO = 4.5, CAP = 2.4;
+  const captionsOf = n => String(n.script || '').split('\n').map(s => s.trim()).filter(Boolean).slice(0, 6);
+  const newsLen = n => Math.max(6, 1.4 + Math.max(1, captionsOf(n).length) * CAP);
+  function timeline() {
+    const list = [{ kind: 'intro', len: INTRO }];
+    data.news.forEach((n, i) => list.push({ kind: 'news', idx: i, len: newsLen(n) }));
+    list.push({ kind: 'outro', len: OUTRO });
+    let s = 0; for (const sc of list) { sc.start = s; s += sc.len; }
+    return { list, total: s };
+  }
 
   // ---------- 유틸 ----------
   const clamp = (v, a=0, b=1) => Math.max(a, Math.min(b, v));
@@ -104,34 +127,63 @@
   const easeInOut = x => x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
   const back = x => { const c = 1.70158, c3 = c + 1; return 1 + c3*Math.pow(x-1,3) + c*Math.pow(x-1,2); };
   const hash = n => { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); };
-  const YELLOW = '#ffd600', NAVY = '#0e1424', CARD = '#161e33', TEXT = '#eef1f7', MUTED = '#a7b0c4';
+  const YELLOW = '#ffd600', NAVY = '#0e1424', TEXT = '#eef1f7', MUTED = '#a7b0c4', RED = '#ff4d4f', BLUE = '#3d8bff', INK = '#1d2540';
 
   function font(size, weight=700) { ctx.font = `${weight} ${size}px ${FONT}`; }
-
   function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w/2, h/2);
     ctx.beginPath();
     ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
     ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
   }
 
-  function wrap(text, maxW) {
-    const words = String(text).split(/\s+/).filter(Boolean);
-    const lines = []; let line = '';
-    for (let word of words) {
-      const test = line ? line + ' ' + word : word;
-      if (ctx.measureText(test).width <= maxW) { line = test; continue; }
-      if (line) lines.push(line);
-      line = '';
-      // 한 단어가 너무 길면 글자 단위로 자르기
-      while (ctx.measureText(word).width > maxW) {
-        let i = 1;
-        while (i < word.length && ctx.measureText(word.slice(0, i+1)).width <= maxW) i++;
-        lines.push(word.slice(0, i)); word = word.slice(i);
-      }
-      line = word;
+  // *강조* 를 포함한 텍스트를 단어 단위로 줄바꿈 (단어 = 색이 다른 조각들의 묶음)
+  function wrapRich(text, maxW) {
+    const words = []; let hl = false;
+    for (const raw of String(text).split(/\s+/).filter(Boolean)) {
+      const segs = [];
+      raw.split('*').forEach((piece, i) => { if (i > 0) hl = !hl; if (piece) segs.push({ w: piece, hl }); });
+      if (segs.length) words.push(segs);
     }
-    if (line) lines.push(line);
+    const space = ctx.measureText(' ').width;
+    const wWidth = segs => segs.reduce((a, g) => a + ctx.measureText(g.w).width, 0);
+    const lines = []; let line = [], lw = 0;
+    const push = () => { if (line.length) lines.push({ words: line, width: lw }); line = []; lw = 0; };
+    for (let segs of words) {
+      let ww = wWidth(segs);
+      if (ww > maxW) { // 너무 긴 단어는 글자 단위로 자르기
+        push();
+        const chars = segs.flatMap(g => [...g.w].map(c => ({ w: c, hl: g.hl })));
+        let cur = [];
+        for (const c of chars) {
+          if (cur.length && wWidth([...cur, c]) > maxW) { lines.push({ words: [cur], width: wWidth(cur) }); cur = []; }
+          cur.push(c);
+        }
+        segs = cur; ww = wWidth(cur);
+      }
+      const add = line.length ? space + ww : ww;
+      if (line.length && lw + add > maxW) { push(); line.push(segs); lw = ww; }
+      else { line.push(segs); lw += add; }
+    }
+    push();
     return lines;
+  }
+  const plain = ln => ln.words.map(segs => segs.map(g => g.w).join('')).join(' ');
+  function drawRichLines(lines, cx, cy, lh, opts={}) {
+    const space = ctx.measureText(' ').width;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    lines.forEach((ln, i) => {
+      let x = cx - ln.width / 2; const y = cy + (i - (lines.length-1)/2) * lh;
+      for (const segs of ln.words) {
+        for (const g of segs) {
+          if (opts.stroke) { ctx.strokeStyle = opts.stroke; ctx.lineWidth = opts.strokeW; ctx.strokeText(g.w, x, y); }
+          ctx.fillStyle = g.hl ? YELLOW : (opts.color || '#fff');
+          ctx.fillText(g.w, x, y);
+          x += ctx.measureText(g.w).width;
+        }
+        x += space;
+      }
+    });
   }
 
   // ---------- 배경 & 스카이라인 ----------
@@ -142,348 +194,456 @@
       buildings.push({ x, w, h, i, shade: 0.55 + hash(i+3) * 0.45 });
       x += w + 6; i++;
     } }
-
   function drawBackground(t) {
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, '#0b1020'); g.addColorStop(.6, '#121a33'); g.addColorStop(1, '#1b2547');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    // 움직이는 격자
     ctx.strokeStyle = 'rgba(255,255,255,.04)'; ctx.lineWidth = 2;
     const off = (t * 40) % 120;
     for (let y = -120 + off; y < H; y += 120) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
     for (let x = 0; x < W; x += 120) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
   }
-
   function drawSkyline(t, rise, alpha=1) {
     ctx.save(); ctx.globalAlpha = alpha;
     for (const b of buildings) {
       const p = easeOut(prog(rise, b.i * 0.05, 0.9));
       const h = b.h * p; if (h <= 1) continue;
-      const y = H - h;
-      const c = Math.round(28 + 30 * b.shade);
-      ctx.fillStyle = `rgb(${c},${c+8},${c+40})`;
-      ctx.fillRect(b.x, y, b.w, h);
-      // 창문
-      for (let wy = y + 30; wy < H - 30; wy += 54) {
+      const y = H - h, c = Math.round(28 + 30 * b.shade);
+      ctx.fillStyle = `rgb(${c},${c+8},${c+40})`; ctx.fillRect(b.x, y, b.w, h);
+      for (let wy = y + 30; wy < H - 30; wy += 54)
         for (let wx = b.x + 18; wx < b.x + b.w - 28; wx += 36) {
           const on = hash(wx * 3.1 + wy * 0.7 + Math.floor(t * 1.5 + hash(wx) * 5)) > 0.55;
           ctx.fillStyle = on ? 'rgba(255,214,0,.85)' : 'rgba(255,255,255,.07)';
           ctx.fillRect(wx, wy, 16, 22);
         }
-      }
     }
     ctx.restore();
   }
+
+  // ---------- 캐릭터: 집 모양 마스코트 ----------
+  // pose: 'point' (위를 가리킴) | 'wave' (손 흔들기) | 'idle'
+  function drawMascot(x, y, s, t, { talk = false, pose = 'idle', look = [0, 0] } = {}) {
+    const bob = Math.sin(t * 3) * 6;
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    // 그림자
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(0, 205, 150, 20, 0, 0, Math.PI*2); ctx.fill();
+    ctx.translate(0, bob);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // 다리
+    for (const [col, lw] of [[INK, 38], ['#ffb84d', 22]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.moveTo(-50, 150); ctx.lineTo(-50, 190 - bob); ctx.moveTo(50, 150); ctx.lineTo(50, 190 - bob); ctx.stroke();
+    }
+    // 팔
+    const arm = (sx, ex, ey) => {
+      const qx = (sx + ex) / 2, qy = (70 + ey) / 2 + 20;
+      for (const [col, lw] of [[INK, 34], ['#fff6dc', 18]]) {
+        ctx.strokeStyle = col; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(sx, 70); ctx.quadraticCurveTo(qx, qy, ex, ey); ctx.stroke();
+      }
+      ctx.fillStyle = '#fff6dc'; ctx.strokeStyle = INK; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(ex, ey, 24, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    };
+    arm(-128, -185, 150 + Math.sin(t * 3 + 1) * 6);
+    if (pose === 'point') arm(128, 225 + Math.sin(t * 5) * 8, -95 + Math.sin(t * 5) * 10);
+    else if (pose === 'wave') { const a = Math.sin(t * 10) * 0.5; arm(128, 128 + Math.cos(-1.1 + a) * 140, 70 + Math.sin(-1.1 + a) * 170); }
+    else arm(128, 185, 150 + Math.sin(t * 3) * 6);
+    // 굴뚝
+    ctx.fillStyle = '#d9a900'; ctx.strokeStyle = INK; ctx.lineWidth = 8;
+    roundRect(68, -175, 42, 80, 8); ctx.fill(); ctx.stroke();
+    // 몸통
+    ctx.fillStyle = '#fff6dc'; roundRect(-130, -60, 260, 220, 44); ctx.fill(); ctx.stroke();
+    // 지붕
+    ctx.fillStyle = YELLOW;
+    ctx.beginPath(); ctx.moveTo(-168, -30); ctx.lineTo(0, -205); ctx.lineTo(168, -30); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // 눈 (가끔 깜빡임)
+    const blink = (t % 3.3) > 3.15 ? 0.12 : 1;
+    for (const ex of [-50, 50]) {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(ex, 30, 30, 36 * blink, 0, 0, Math.PI*2); ctx.fill();
+      ctx.lineWidth = 6; ctx.stroke();
+      if (blink > .5) {
+        ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(ex + look[0] * 10, 34 + look[1] * 10, 16, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + look[0] * 10 + 6, 28 + look[1] * 10, 5, 0, Math.PI*2); ctx.fill();
+      }
+    }
+    // 볼
+    ctx.fillStyle = 'rgba(255,120,140,.45)';
+    ctx.beginPath(); ctx.ellipse(-92, 82, 22, 13, 0, 0, Math.PI*2); ctx.ellipse(92, 82, 22, 13, 0, 0, Math.PI*2); ctx.fill();
+    // 입
+    if (talk) {
+      const open = 6 + Math.abs(Math.sin(t * 17)) * 18 + Math.abs(Math.sin(t * 7)) * 6;
+      ctx.fillStyle = '#7a1f2b'; ctx.strokeStyle = INK; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.ellipse(0, 100, 26, open, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.strokeStyle = INK; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(0, 86, 26, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function bubble(x, y, w, h, tailX, tailY, a) {
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = INK; ctx.lineWidth = 8;
+    roundRect(x, y, w, h, 40); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tailX - 30, y + h - 4); ctx.lineTo(tailX, tailY); ctx.lineTo(tailX + 30, y + h - 4); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tailX - 30, y + h); ctx.lineTo(tailX, tailY); ctx.lineTo(tailX + 30, y + h); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- 핵심 숫자 배지 ----------
+  const statColor = s => /^\s*[-−▼]|하락|감소|내림/.test(s) ? BLUE : (/^\s*[+▲]|상승|증가|오름/.test(s) ? RED : '#7a5cff');
+  function statBadge(lt, x, y, text, delay = 2.2, size = 64) {
+    if (!text) return;
+    const s = back(prog(lt, delay, 0.5)); if (s <= 0) return;
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    font(size, 900); const w = ctx.measureText(text).width + size * 1.2;
+    ctx.fillStyle = statColor(text); roundRect(-w/2, -size * 0.85, w, size * 1.7, size * 0.85); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, 0, 3);
+    ctx.restore();
+  }
+
+  // ---------- 인포그래픽 (0,0 중심 좌표) ----------
+  function infoChart(lt, n) {
+    const down = statColor(n.stat || '') === BLUE;
+    const base = [[-320,140],[-200,60],[-90,110],[20,-10],[130,30],[250,-130],[330,-170]];
+    const pts = down ? base.map(([x, y]) => [x, -y]) : base;
+    ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(-360, -220); ctx.lineTo(-360, 220); ctx.lineTo(370, 220); ctx.stroke();
+    const p = easeInOut(prog(lt, 0.6, 1.8)), total = pts.length - 1, upto = p * total;
+    const path = [pts[0]];
+    for (let i = 1; i <= total; i++) {
+      if (i <= upto) path.push(pts[i]);
+      else { const f = upto - (i-1), a = pts[i-1], b = pts[i]; path.push([a[0] + (b[0]-a[0])*f, a[1] + (b[1]-a[1])*f]); break; }
+    }
+    const last = path[path.length - 1], col = down ? BLUE : YELLOW;
+    ctx.beginPath(); ctx.moveTo(path[0][0], 220); path.forEach(([x, y]) => ctx.lineTo(x, y)); ctx.lineTo(last[0], 220); ctx.closePath();
+    const g = ctx.createLinearGradient(0, -200, 0, 220);
+    g.addColorStop(0, down ? 'rgba(61,139,255,.35)' : 'rgba(255,214,0,.35)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.beginPath(); path.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+    ctx.strokeStyle = col; ctx.lineWidth = 14; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(last[0], last[1], 22 + Math.sin(lt*8)*4, 0, Math.PI*2); ctx.fill();
+    statBadge(lt, 180, down ? 290 : -290, n.stat);
+  }
+  function infoBars(lt, n) {
+    const down = statColor(n.stat || '') === BLUE;
+    const hs = down ? [360, 320, 300, 250, 170] : [170, 220, 200, 270, 360];
+    ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(-360, 230); ctx.lineTo(360, 230); ctx.stroke();
+    hs.forEach((h, i) => {
+      const p = back(prog(lt, 0.5 + i * 0.15, 0.6)), hh = h * p, x = -330 + i * 140;
+      ctx.fillStyle = i === hs.length - 1 ? (down ? BLUE : YELLOW) : '#3a4a7a';
+      roundRect(x, 230 - hh, 100, Math.max(hh, 1), 14); ctx.fill();
+    });
+    statBadge(lt, 230, 230 - hs[4] - 90, n.stat, 1.6);
+  }
+  function infoNumber(lt, n) {
+    const p = easeOut(prog(lt, 0.4, 1.6));
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 34;
+    ctx.beginPath(); ctx.arc(0, 0, 250, 0, Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = n.stat ? statColor(n.stat) : YELLOW;
+    ctx.beginPath(); ctx.arc(0, 0, 250, -Math.PI/2, -Math.PI/2 + Math.PI*2*p); ctx.stroke();
+    // 숫자 0부터 올라가기
+    const raw = n.stat || '0', m = raw.match(/\d[\d,]*(\.\d+)?/);
+    let shown = raw;
+    if (m) {
+      const val = parseFloat(m[0].replace(/,/g, '')), dec = m[1] ? m[1].length - 1 : 0;
+      const cur = (val * p).toFixed(dec);
+      const fmt = m[0].includes(',') ? Number(cur).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) : cur;
+      shown = raw.slice(0, m.index) + fmt + raw.slice(m.index + m[0].length);
+    }
+    let size = 150; font(size, 900);
+    while (ctx.measureText(shown).width > 400 && size > 60) { size -= 8; font(size, 900); }
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(shown, 0, 8);
+  }
+  function infoHouse(lt, n) {
+    const p = back(prog(lt, 0.5, 0.8));
+    ctx.save(); ctx.translate(0, 60); ctx.scale(p, p);
+    ctx.fillStyle = YELLOW; ctx.beginPath(); ctx.moveTo(-280, -40); ctx.lineTo(0, -280); ctx.lineTo(280, -40); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#e9ecf5'; ctx.fillRect(-220, -40, 440, 260);
+    ctx.fillStyle = NAVY; ctx.fillRect(-50, 80, 100, 140);
+    ctx.fillStyle = Math.sin(lt * 4) > 0 ? YELLOW : '#3a4a7a'; ctx.fillRect(-180, 20, 90, 90); ctx.fillRect(90, 20, 90, 90);
+    ctx.restore();
+    const d = easeOut(prog(lt, 1.4, 0.7));
+    if (d > 0) {
+      ctx.save(); ctx.translate(250, -330 + d * 150); ctx.rotate(0.2 + Math.sin(lt * 3) * 0.12 * d);
+      ctx.strokeStyle = '#c9ced9'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(0, -110); ctx.lineTo(0, -40); ctx.stroke();
+      const tag = n.stat || '매물';
+      font(54, 900); const w = Math.max(180, ctx.measureText(tag).width + 60);
+      ctx.fillStyle = n.stat ? statColor(n.stat) : RED; roundRect(-w/2, -40, w, 120, 20); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, -20, 10, 0, Math.PI*2); ctx.fill();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(tag, 0, 30);
+      ctx.restore();
+    }
+  }
+  function infoPolicy(lt, n) {
+    const p = easeOut(prog(lt, 0.5, 0.7));
+    ctx.save(); ctx.globalAlpha = p; ctx.translate(-40, (1-p)*80); ctx.rotate(-0.05);
+    ctx.fillStyle = '#f4f6fb'; roundRect(-220, -280, 440, 560, 24); ctx.fill();
+    ctx.fillStyle = NAVY; font(52, 900); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('정책 발표', 0, -200);
+    for (let i = 0; i < 6; i++) {
+      const lp = easeOut(prog(lt, 0.9 + i * 0.15, 0.4));
+      ctx.fillStyle = '#c9ced9'; roundRect(-160, -110 + i * 60, (i % 3 === 2 ? 210 : 320) * lp, 22, 11); ctx.fill();
+    }
+    ctx.restore();
+    const s = prog(lt, 2.0, 0.35);
+    if (s > 0) {
+      const sc = 2.2 - 1.2 * easeOut(s), word = n.stat || '확정';
+      ctx.save(); ctx.translate(150, 170); ctx.rotate(-0.25); ctx.scale(sc, sc); ctx.globalAlpha = clamp(s * 2);
+      ctx.strokeStyle = RED; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(0, 0, 115, 0, Math.PI*2); ctx.stroke();
+      ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 92, 0, Math.PI*2); ctx.stroke();
+      let size = 64; font(size, 900); while (ctx.measureText(word).width > 160 && size > 30) { size -= 4; font(size, 900); }
+      ctx.fillStyle = RED; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(word, 0, 4);
+      ctx.restore();
+    }
+  }
+  const INFO = { chart: infoChart, bars: infoBars, number: infoNumber, house: infoHouse, policy: infoPolicy };
 
   // ---------- 장면: 오프닝 ----------
   function drawIntro(lt) {
-    drawSkyline(lt, lt);
-    const a = easeOut(prog(lt, 0.3, 0.6));
+    drawSkyline(lt, lt, 0.7);
+    const a = easeOut(prog(lt, 0.2, 0.6));
     ctx.save(); ctx.globalAlpha = a; ctx.translate(0, (1 - a) * 60);
-    // 띠
     font(52, 900); const band = '매일 아침 1분';
     const bw = ctx.measureText(band).width + 64;
-    ctx.fillStyle = '#000'; roundRect((W - bw)/2, 380, bw, 96, 18); ctx.fill();
-    ctx.fillStyle = YELLOW; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(band, W/2, 430);
+    ctx.fillStyle = '#000'; roundRect((W - bw)/2, 250, bw, 96, 18); ctx.fill();
+    ctx.fillStyle = YELLOW; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(band, W/2, 300);
     ctx.restore();
 
-    const b = back(prog(lt, 0.7, 0.7));
-    ctx.save(); ctx.globalAlpha = clamp(b); ctx.translate(W/2, 640); ctx.scale(0.6 + 0.4*b, 0.6 + 0.4*b);
-    font(118, 900); ctx.fillStyle = TEXT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const lines = wrap(data.title, 940);
-    lines.forEach((l, i) => ctx.fillText(l, 0, (i - (lines.length-1)/2) * 140));
+    const b = back(prog(lt, 0.5, 0.7));
+    ctx.save(); ctx.globalAlpha = clamp(b); ctx.translate(W/2, 500); ctx.scale(0.6 + 0.4*b, 0.6 + 0.4*b);
+    font(124, 900);
+    drawRichLines(wrapRich(data.title, 960), 0, 0, 150, { stroke: '#000', strokeW: 20 });
     ctx.restore();
 
-    const c = easeOut(prog(lt, 1.3, 0.6));
-    ctx.save(); ctx.globalAlpha = c;
-    font(60, 700); ctx.fillStyle = YELLOW; ctx.textAlign = 'center';
-    ctx.fillText(data.date, W/2, 860);
-    font(44, 500); ctx.fillStyle = MUTED;
-    ctx.fillText('주요 소식 3가지', W/2, 950);
-    ctx.restore();
-  }
+    const c = easeOut(prog(lt, 1.0, 0.6));
+    ctx.save(); ctx.globalAlpha = c; font(60, 700); ctx.fillStyle = YELLOW; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(data.date, W/2, 720); ctx.restore();
 
-  // ---------- 아이콘 애니메이션 ----------
-  function iconChart(lt, cx, cy) {
-    const pts = [[-320,140],[-200,60],[-90,110],[20,-10],[130,30],[250,-130],[330,-170]];
-    // 축
-    ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(cx-360, cy-220); ctx.lineTo(cx-360, cy+200); ctx.lineTo(cx+370, cy+200); ctx.stroke();
-    const p = easeInOut(prog(lt, 0.6, 1.8));
-    const total = pts.length - 1, upto = p * total;
-    // 영역
-    ctx.beginPath(); ctx.moveTo(cx + pts[0][0], cy + 200);
-    let last = pts[0];
-    for (let i = 0; i <= total; i++) {
-      if (i <= upto) { ctx.lineTo(cx + pts[i][0], cy + pts[i][1]); last = pts[i]; }
-      else { const f = upto - (i-1); const a = pts[i-1], b2 = pts[i];
-        last = [a[0] + (b2[0]-a[0])*f, a[1] + (b2[1]-a[1])*f]; ctx.lineTo(cx + last[0], cy + last[1]); break; }
-    }
-    ctx.lineTo(cx + last[0], cy + 200); ctx.closePath();
-    const g = ctx.createLinearGradient(0, cy-200, 0, cy+200);
-    g.addColorStop(0, 'rgba(255,214,0,.35)'); g.addColorStop(1, 'rgba(255,214,0,0)');
-    ctx.fillStyle = g; ctx.fill();
-    // 선
-    ctx.beginPath(); ctx.moveTo(cx + pts[0][0], cy + pts[0][1]);
-    for (let i = 1; i <= total; i++) {
-      if (i <= upto) ctx.lineTo(cx + pts[i][0], cy + pts[i][1]);
-      else { ctx.lineTo(cx + last[0], cy + last[1]); break; }
-    }
-    ctx.strokeStyle = YELLOW; ctx.lineWidth = 14; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
-    // 점
-    ctx.fillStyle = YELLOW; ctx.beginPath(); ctx.arc(cx + last[0], cy + last[1], 22 + Math.sin(lt*8)*4, 0, Math.PI*2); ctx.fill();
-    // 화살표 배지
-    const s = back(prog(lt, 2.4, 0.5));
-    if (s > 0) {
-      ctx.save(); ctx.translate(cx + 250, cy - 290); ctx.scale(s, s);
-      ctx.fillStyle = '#ff4d4f'; roundRect(-110, -50, 220, 100, 50); ctx.fill();
-      font(54, 900); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('▲ 상승', 0, 2); ctx.restore();
+    // 캐릭터가 아래에서 뛰어오름
+    const j = prog(lt, 1.2, 0.7);
+    if (j > 0) {
+      const y = 1420 + (1 - back(j)) * 700;
+      drawMascot(W/2, y, 1.25, lt, { talk: lt > 2 && lt < 4, pose: 'wave' });
+      const bb = back(prog(lt, 1.9, 0.4));
+      if (bb > 0) {
+        ctx.save(); ctx.translate(W/2, 960); ctx.scale(bb, bb);
+        font(64, 900); const tw = Math.min(900, ctx.measureText(data.greet).width + 100);
+        bubble(-tw/2, -80, tw, 140, 0, 130, 1);
+        ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(data.greet, 0, -8, tw - 60);
+        ctx.restore();
+      }
     }
   }
-
-  function iconHouse(lt, cx, cy) {
-    const p = back(prog(lt, 0.5, 0.8));
-    ctx.save(); ctx.translate(cx, cy + 40); ctx.scale(p, p);
-    // 지붕
-    ctx.fillStyle = YELLOW;
-    ctx.beginPath(); ctx.moveTo(-280, -40); ctx.lineTo(0, -280); ctx.lineTo(280, -40); ctx.closePath(); ctx.fill();
-    // 몸체
-    ctx.fillStyle = '#e9ecf5'; ctx.fillRect(-220, -40, 440, 280);
-    // 문, 창
-    ctx.fillStyle = NAVY; ctx.fillRect(-50, 80, 100, 160);
-    const lit = Math.sin(lt * 4) > 0 ? YELLOW : '#3a4a7a';
-    ctx.fillStyle = lit; ctx.fillRect(-180, 20, 90, 90); ctx.fillRect(90, 20, 90, 90);
-    // 굴뚝
-    ctx.fillStyle = '#c9ced9'; ctx.fillRect(130, -230, 60, 120);
-    ctx.restore();
-    // 연기
-    for (let i = 0; i < 3; i++) {
-      const k = ((lt * 0.6 + i / 3) % 1);
-      ctx.fillStyle = `rgba(255,255,255,${0.35 * (1-k) * clamp(p)})`;
-      ctx.beginPath(); ctx.arc(cx + 160 + Math.sin(k*6)*20, cy - 220 - k*200, 26 + k*30, 0, Math.PI*2); ctx.fill();
-    }
-    // 가격표 (흔들리며 떨어짐)
-    const d = easeOut(prog(lt, 1.6, 0.7));
-    if (d > 0) {
-      const sw = Math.sin(lt * 3) * 0.12 * d;
-      ctx.save(); ctx.translate(cx + 260, cy - 340 + d * 160); ctx.rotate(0.2 + sw);
-      ctx.strokeStyle = '#c9ced9'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(0, -120); ctx.lineTo(0, -40); ctx.stroke();
-      ctx.fillStyle = '#ff4d4f'; roundRect(-90, -40, 180, 120, 20); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, -20, 10, 0, Math.PI*2); ctx.fill();
-      font(56, 900); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('매물', 0, 30);
-      ctx.restore();
-    }
-  }
-
-  function iconPolicy(lt, cx, cy) {
-    const p = easeOut(prog(lt, 0.5, 0.7));
-    ctx.save(); ctx.globalAlpha = p; ctx.translate(cx, cy + (1-p)*80); ctx.rotate(-0.05);
-    ctx.fillStyle = '#f4f6fb'; roundRect(-230, -290, 460, 580, 24); ctx.fill();
-    ctx.fillStyle = NAVY; font(52, 900); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('정책 발표', 0, -210);
-    for (let i = 0; i < 6; i++) {
-      const lp = easeOut(prog(lt, 0.9 + i * 0.15, 0.4));
-      ctx.fillStyle = '#c9ced9'; roundRect(-170, -120 + i * 60, (i % 3 === 2 ? 220 : 340) * lp, 22, 11); ctx.fill();
-    }
-    ctx.restore();
-    // 도장
-    const s = prog(lt, 2.2, 0.35);
-    if (s > 0) {
-      const sc = 2.2 - 1.2 * easeOut(s);
-      ctx.save(); ctx.translate(cx + 150, cy + 180); ctx.rotate(-0.25); ctx.scale(sc, sc);
-      ctx.globalAlpha = clamp(s * 2);
-      ctx.strokeStyle = '#ff4d4f'; ctx.lineWidth = 12;
-      ctx.beginPath(); ctx.arc(0, 0, 110, 0, Math.PI*2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(0, 0, 88, 0, Math.PI*2); ctx.lineWidth = 4; ctx.stroke();
-      ctx.fillStyle = '#ff4d4f'; font(64, 900); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('확정', 0, 4);
-      ctx.restore();
-    }
-  }
-  const ICONS = { chart: iconChart, house: iconHouse, policy: iconPolicy };
 
   // ---------- 장면: 뉴스 ----------
-  function drawNews(lt, idx) {
+  function drawNews(lt, idx, len) {
     const n = data.news[idx];
-    drawSkyline(lt + 10, 1, 0.25);
-    // 상단 진행 표시
+    drawSkyline(lt + 10, 1, 0.2);
+    // 진행 막대
     for (let i = 0; i < 3; i++) {
       ctx.fillStyle = i < idx ? YELLOW : 'rgba(255,255,255,.18)';
-      roundRect(90 + i * 310, 120, 280, 14, 7); ctx.fill();
-      if (i === idx) { ctx.fillStyle = YELLOW; roundRect(90 + i * 310, 120, 280 * clamp(lt / NEWS), 14, 7); ctx.fill(); }
+      roundRect(90 + i * 310, 90, 280, 14, 7); ctx.fill();
+      if (i === idx) { ctx.fillStyle = YELLOW; roundRect(90 + i * 310, 90, Math.max(14, 280 * clamp(lt / len)), 14, 7); ctx.fill(); }
     }
-    // 번호 배지
+    // 번호 + 헤드라인
     const b = back(prog(lt, 0, 0.5));
-    ctx.save(); ctx.translate(180, 300); ctx.scale(b, b);
-    ctx.fillStyle = YELLOW; ctx.beginPath(); ctx.arc(0, 0, 90, 0, Math.PI*2); ctx.fill();
-    font(110, 900); ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(String(idx + 1), 0, 6); ctx.restore();
+    ctx.save(); ctx.translate(140, 240); ctx.scale(b, b);
+    ctx.fillStyle = YELLOW; ctx.beginPath(); ctx.arc(0, 0, 70, 0, Math.PI*2); ctx.fill();
+    font(88, 900); ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(idx + 1), 0, 5);
+    ctx.restore();
     const a0 = easeOut(prog(lt, 0.15, 0.5));
-    ctx.save(); ctx.globalAlpha = a0;
-    font(46, 700); ctx.fillStyle = MUTED; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(`NEWS ${idx + 1} / 3`, 310 - (1-a0)*40, 300);
+    ctx.save(); ctx.globalAlpha = a0; ctx.translate((1-a0) * 40, 0);
+    font(54, 900);
+    const hl = wrapRich(n.headline, 790).slice(0, 2);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = TEXT;
+    hl.forEach((ln, i) => ctx.fillText(plain(ln), 240, 240 + (i - (hl.length-1)/2) * 68));
     ctx.restore();
 
-    // 아이콘
-    (ICONS[n.icon] || iconChart)(lt, W/2, 760);
-
-    // 헤드라인 카드
-    const c = easeOut(prog(lt, 0.3, 0.6));
-    ctx.save(); ctx.globalAlpha = c; ctx.translate(0, (1-c) * 120);
-    font(80, 900);
-    const lines = wrap(n.headline, 860).slice(0, 4);
-    const lh = 108, cardH = lines.length * lh + 120, top = 1180;
-    ctx.fillStyle = 'rgba(22,30,51,.94)'; roundRect(60, top, W - 120, cardH, 36); ctx.fill();
-    ctx.fillStyle = YELLOW; roundRect(60, top, 16, cardH, 8); ctx.fill();
-    ctx.fillStyle = TEXT; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    lines.forEach((l, i) => {
-      const lp = easeOut(prog(lt, 0.5 + i * 0.18, 0.45));
-      ctx.save(); ctx.globalAlpha = lp; ctx.fillText(l, 110 + (1-lp) * 40, top + 60 + i * lh); ctx.restore();
-    });
+    // 인포그래픽 패널
+    const pp = easeOut(prog(lt, 0.2, 0.5));
+    ctx.save(); ctx.globalAlpha = pp;
+    ctx.fillStyle = 'rgba(22,30,51,.9)'; roundRect(50, 370, W - 100, 740, 40); ctx.fill();
+    ctx.translate(W/2, 730); ctx.scale(0.82, 0.82);
+    (INFO[n.icon] || infoChart)(lt, n);
     ctx.restore();
+    if (n.statLabel) {
+      const la = easeOut(prog(lt, 0.9, 0.5));
+      ctx.save(); ctx.globalAlpha = la; font(42, 700); ctx.fillStyle = MUTED; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(n.statLabel, W/2, 1060, 900); ctx.restore();
+    }
+
+    // 큰 자막: 한 줄씩 튀어나옴
+    const caps = captionsOf(n);
+    const slot = caps.length ? (len - 1.0) / caps.length : len;
+    const ci = Math.min(caps.length - 1, Math.floor(Math.max(0, lt - 0.6) / slot));
+    let talking = false;
+    if (caps.length && lt >= 0.6) {
+      const cl = lt - 0.6 - ci * slot;
+      talking = cl < slot * 0.85;
+      const pop = back(prog(cl, 0, 0.35));
+      ctx.save(); ctx.translate(W/2, 1270); ctx.scale(0.7 + 0.3 * pop, 0.7 + 0.3 * pop); ctx.globalAlpha = clamp(pop * 1.5);
+      let size = 96; font(size, 900);
+      let lines = wrapRich(caps[ci], 960);
+      while (lines.length > 2 && size > 64) { size -= 8; font(size, 900); lines = wrapRich(caps[ci], 960); }
+      drawRichLines(lines, 0, 0, size * 1.22, { stroke: '#000', strokeW: size * 0.2 });
+      ctx.restore();
+    }
+
+    // 캐릭터
+    const m = back(prog(lt, 0.2, 0.6));
+    drawMascot(190 - (1 - m) * 400, 1640, 0.95, lt, { talk: talking, pose: 'point', look: [0.6, -0.8] });
 
     // 출처
-    const s = easeOut(prog(lt, 1.2, 0.5));
-    ctx.save(); ctx.globalAlpha = s;
-    font(44, 500); ctx.fillStyle = MUTED; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(`출처: ${n.source}`, W/2, 1180 + lines.length * lh + 200);
-    ctx.restore();
+    const s = easeOut(prog(lt, 1.0, 0.5));
+    ctx.save(); ctx.globalAlpha = s; font(40, 700); ctx.fillStyle = MUTED; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(`출처: ${n.source}`, W - 70, 1760); ctx.restore();
   }
 
   // ---------- 장면: 마무리 ----------
   function drawOutro(lt) {
-    drawSkyline(lt + 20, 1, 0.6);
+    drawSkyline(lt + 20, 1, 0.5);
     const a = back(prog(lt, 0.1, 0.7));
-    ctx.save(); ctx.translate(W/2, 600); ctx.scale(a, a);
-    font(96, 900); ctx.fillStyle = TEXT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('내일 아침에도', 0, -70);
-    ctx.fillStyle = YELLOW; ctx.fillText('1분 부동산 뉴스', 0, 60);
+    ctx.save(); ctx.translate(W/2, 420); ctx.scale(a, a);
+    font(100, 900);
+    drawRichLines(wrapRich('내일 아침에도 *1분 부동산 뉴스*', 960), 0, 0, 130, { stroke: '#000', strokeW: 20 });
     ctx.restore();
-    // 구독 버튼
-    const b = easeOut(prog(lt, 0.8, 0.5));
-    const pulse = 1 + Math.sin(lt * 6) * 0.04 * b;
-    ctx.save(); ctx.globalAlpha = b; ctx.translate(W/2, 900); ctx.scale(pulse, pulse);
-    ctx.fillStyle = '#ff0033'; roundRect(-260, -80, 520, 160, 80); ctx.fill();
-    font(68, 900); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('구독 · 좋아요', 0, 4);
+    const b = easeOut(prog(lt, 0.7, 0.5)), pulse = 1 + Math.sin(lt * 6) * 0.04 * b;
+    ctx.save(); ctx.globalAlpha = b; ctx.translate(W/2, 720); ctx.scale(pulse, pulse);
+    ctx.fillStyle = '#ff0033'; roundRect(-270, -85, 540, 170, 85); ctx.fill();
+    font(70, 900); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('구독 · 좋아요', 0, 4);
     ctx.restore();
-    // 손가락 탭
-    const tp = prog(lt, 1.6, 0.6);
+    const tp = prog(lt, 1.5, 0.6);
     if (tp > 0 && tp < 1) {
       ctx.save(); ctx.globalAlpha = 1 - tp; ctx.strokeStyle = '#fff'; ctx.lineWidth = 8;
-      ctx.beginPath(); ctx.arc(W/2 + 180, 920, 30 + tp * 90, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+      ctx.beginPath(); ctx.arc(W/2 + 190, 740, 30 + tp * 90, 0, Math.PI*2); ctx.stroke(); ctx.restore();
     }
-    // 안내
-    const d = easeOut(prog(lt, 1.2, 0.6));
-    ctx.save(); ctx.globalAlpha = d;
-    font(40, 500); ctx.fillStyle = MUTED; ctx.textAlign = 'center';
-    ctx.fillText('본 영상은 뉴스 요약이며 투자 권유가 아닙니다', W/2, 1110);
-    ctx.fillText('AI 음성으로 제작되었습니다', W/2, 1170);
+    const d = easeOut(prog(lt, 1.0, 0.6));
+    ctx.save(); ctx.globalAlpha = d; font(40, 500); ctx.fillStyle = MUTED; ctx.textAlign = 'center';
+    ctx.fillText('본 영상은 뉴스 요약이며 투자 권유가 아닙니다', W/2, 920);
+    ctx.fillText('AI 음성으로 제작되었습니다', W/2, 980);
     ctx.restore();
+    const m = back(prog(lt, 0.3, 0.6));
+    drawMascot(W/2, 1430 + (1 - m) * 600, 1.2, lt, { talk: lt > 0.8 && lt < 2.8, pose: 'wave' });
   }
 
   // ---------- 렌더 ----------
   function render(t) {
+    const { list, total } = timeline();
+    t = clamp(t, 0, total - 0.001);
     ctx.clearRect(0, 0, W, H);
     drawBackground(t);
-    let scene, lt, len;
-    if (t < INTRO) { scene = 'intro'; lt = t; len = INTRO; }
-    else if (t < INTRO + NEWS * 3) { const k = Math.floor((t - INTRO) / NEWS); scene = k; lt = t - INTRO - k * NEWS; len = NEWS; }
-    else { scene = 'outro'; lt = t - INTRO - NEWS * 3; len = OUTRO; }
-    // 장면 사이 전환: 끝부분에서 살짝 밀려나며 사라짐
-    const out = scene === 'outro' ? 0 : easeInOut(prog(lt, len - 0.4, 0.4));
+    const sc = list.find(s => t < s.start + s.len) || list[list.length - 1];
+    const lt = t - sc.start;
+    const out = sc.kind === 'outro' ? 0 : easeInOut(prog(lt, sc.len - 0.35, 0.35));
     ctx.save(); ctx.globalAlpha = 1 - out; ctx.translate(-out * 120, 0);
-    if (scene === 'intro') drawIntro(lt);
-    else if (scene === 'outro') drawOutro(lt);
-    else drawNews(lt, scene);
+    if (sc.kind === 'intro') drawIntro(lt);
+    else if (sc.kind === 'outro') drawOutro(lt);
+    else drawNews(lt, sc.idx, sc.len);
     ctx.restore();
-    // 하단 채널명
-    font(36, 700); ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('부동산 정보 룽숏', W/2, H - 90);
+    font(34, 700); ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('부동산 정보 룽숏', W/2, H - 70);
   }
-  window.renderAt = render; // 프레임 단위 렌더용
+  window.renderAt = render;
+  window.totalDuration = () => timeline().total;
 
   // ---------- 재생 ----------
   const playBtn = document.getElementById('play'), recBtn = document.getElementById('rec');
   const progEl = document.getElementById('prog'), statusEl = document.getElementById('status');
-  let playing = false, t0 = 0, cur = 0, onEnd = null;
+  let playing = false, t0 = 0, cur = 2.6, onEnd = null;
+  const setProg = () => { progEl.style.width = (cur / timeline().total * 100) + '%'; };
 
   function frame(now) {
     if (!playing) return;
     cur = (now - t0) / 1000;
-    if (cur >= DURATION) {
-      cur = DURATION; render(DURATION - 0.001); playing = false; setBtn();
-      progEl.style.width = '100%';
+    const total = timeline().total;
+    if (cur >= total) {
+      cur = total; render(total); playing = false; setBtn(); setProg();
       if (onEnd) { const f = onEnd; onEnd = null; f(); }
       return;
     }
-    render(cur); progEl.style.width = (cur / DURATION * 100) + '%';
-    requestAnimationFrame(frame);
+    render(cur); setProg(); requestAnimationFrame(frame);
   }
   function play(from) {
     if (from !== undefined) cur = from;
-    if (cur >= DURATION) cur = 0;
+    if (cur >= timeline().total) cur = 0;
     t0 = performance.now() - cur * 1000; playing = true; setBtn(); requestAnimationFrame(frame);
   }
   function pause() { playing = false; setBtn(); }
   function setBtn() { playBtn.textContent = playing ? '❚❚ 일시정지' : '▶ 재생'; }
-
   playBtn.onclick = () => playing ? pause() : play();
   document.getElementById('restart').onclick = () => play(0);
+  function preview(t) { if (playing) return; cur = t; render(cur); setProg(); }
 
   // ---------- 녹화 ----------
   recBtn.onclick = () => {
     if (!cv.captureStream || !window.MediaRecorder) { statusEl.textContent = '이 브라우저는 영상 저장을 지원하지 않아요. 화면 녹화를 이용해 주세요.'; return; }
     const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
     const mime = types.find(m => MediaRecorder.isTypeSupported(m)) || '';
-    const stream = cv.captureStream(30);
     let rec;
-    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 }); }
+    try { rec = new MediaRecorder(cv.captureStream(30), mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : undefined); }
     catch (e) { statusEl.textContent = '녹화를 시작할 수 없어요: ' + e.message; return; }
     const chunks = [];
     rec.ondataavailable = e => e.data.size && chunks.push(e.data);
     rec.onstop = () => {
       const type = rec.mimeType || mime || 'video/webm';
-      const blob = new Blob(chunks, { type });
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = URL.createObjectURL(new Blob(chunks, { type }));
       a.download = `shorts-${today.toISOString().slice(0,10)}.${type.includes('mp4') ? 'mp4' : 'webm'}`;
       document.body.appendChild(a); a.click(); a.remove();
       statusEl.textContent = '저장 완료!'; recBtn.disabled = false;
     };
-    recBtn.disabled = true; statusEl.textContent = `녹화 중… (${Math.round(DURATION)}초) 탭을 닫지 마세요`;
-    rec.start();
-    onEnd = () => setTimeout(() => rec.stop(), 300);
-    play(0);
+    recBtn.disabled = true; statusEl.textContent = `녹화 중… (${Math.round(timeline().total)}초) 탭을 닫지 마세요`;
+    rec.start(); onEnd = () => setTimeout(() => rec.stop(), 300); play(0);
   };
 
   // ---------- 편집 폼 ----------
-  const dateEl = document.getElementById('date'), titleEl = document.getElementById('title');
-  dateEl.value = data.date; titleEl.value = data.title;
-  const ICON_NAMES = { chart: '📈 가격 그래프', house: '🏠 집 · 매물', policy: '📄 정책 문서' };
-  const forms = document.getElementById('newsForms');
-  data.news.forEach((n, i) => {
-    const card = document.createElement('div'); card.className = 'card';
-    card.innerHTML = `<h2>뉴스 ${i+1}</h2>
-      <label for="h${i}">헤드라인 (짧을수록 좋아요)</label><textarea id="h${i}" maxlength="60"></textarea>
-      <div class="row"><div><label for="s${i}">출처 언론사</label><input id="s${i}"></div>
-      <div><label for="i${i}">그림</label><select id="i${i}">${Object.entries(ICON_NAMES).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}</select></div></div>`;
-    forms.appendChild(card);
-    const h = card.querySelector('textarea'), s = card.querySelector('input'), ic = card.querySelector('select');
-    h.value = n.headline; s.value = n.source; ic.value = n.icon;
-    const upd = () => { n.headline = h.value; n.source = s.value; n.icon = ic.value; save();
-      if (!playing) { cur = INTRO + i * NEWS + 3.5; render(cur); progEl.style.width = (cur / DURATION * 100) + '%'; } };
-    h.oninput = s.oninput = ic.onchange = upd;
-  });
-  const updTop = () => { data.date = dateEl.value; data.title = titleEl.value; save(); if (!playing) { cur = 2.5; render(cur); } };
-  dateEl.oninput = titleEl.oninput = updTop;
+  const ICON_NAMES = { chart: '📈 꺾은선 그래프', bars: '📊 막대 그래프', number: '🔢 숫자 카운트', house: '🏠 집 · 가격표', policy: '📄 정책 · 도장' };
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  function buildForms() {
+    const top = { date: 'date', title: 'title', greet: 'greet' };
+    for (const [k, id] of Object.entries(top)) {
+      const el = document.getElementById(id); el.value = data[k];
+      el.oninput = () => { data[k] = el.value; save(); preview(k === 'title' || k === 'date' ? 1.8 : 3.2); };
+    }
+    const forms = document.getElementById('newsForms'); forms.innerHTML = '';
+    data.news.forEach((n, i) => {
+      const card = document.createElement('div'); card.className = 'card';
+      card.innerHTML = `<h2>뉴스 ${i+1}</h2>
+        <label>헤드라인 (상단 제목)</label><input data-k="headline" maxlength="50">
+        <label>자막 대본 (한 줄 = 한 장면, *강조*)</label><textarea class="script" data-k="script"></textarea>
+        <div class="row">
+          <div><label>그림</label><select data-k="icon">${Object.entries(ICON_NAMES).map(([k,v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
+          <div><label>핵심 숫자 (예: +0.12%)</label><input data-k="stat" maxlength="12"></div>
+        </div>
+        <div class="row">
+          <div><label>숫자 설명</label><input data-k="statLabel" maxlength="30"></div>
+          <div><label>출처 언론사</label><input data-k="source" maxlength="20"></div>
+        </div>`;
+      forms.appendChild(card);
+      card.querySelectorAll('[data-k]').forEach(el => {
+        el.value = n[el.dataset.k] || '';
+        el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = () => {
+          n[el.dataset.k] = el.value; save();
+          const sc = timeline().list[i + 1];
+          preview(sc.start + (el.dataset.k === 'script' ? Math.min(sc.len - 0.5, 1.4) : 3.0));
+        };
+      });
+    });
+  }
+  buildForms();
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('입력한 내용을 지우고 예시로 되돌릴까요?')) return;
+    data = clone(DEFAULTS); save(); buildForms(); preview(2.6);
+  };
 
-  // 글꼴이 준비되면 첫 화면 그리기
-  render(2.5);
-  const ready = document.fonts ? Promise.all([document.fonts.load(`900 80px "Noto Sans KR"`), document.fonts.load(`500 40px "Noto Sans KR"`)]) : Promise.resolve();
-  ready.catch(() => {}).then(() => { if (!playing) render(cur || 2.5); });
+  render(cur);
+  const ready = document.fonts ? Promise.all([document.fonts.load(`900 80px "Noto Sans KR"`), document.fonts.load(`700 40px "Noto Sans KR"`)]) : Promise.resolve();
+  ready.catch(() => {}).then(() => { if (!playing) render(cur); });
 })();
 </script>
 </body>
